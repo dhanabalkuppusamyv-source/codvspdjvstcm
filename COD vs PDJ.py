@@ -12,59 +12,51 @@ st.set_page_config(page_title="COD Compare", layout="wide")
 
 logo_url = "https://raw.githubusercontent.com/Uthraa-18/cod-compare-app/refs/heads/main/image.png"
 
-st.markdown(
-    f"""
-    <style>
-    .corner-logo {{
-        position: fixed;
-        top: 50px;
-        right: 20px;
-        width: 120px;
-        z-index: 9999;
-    }}
-    </style>
+st.markdown(f"""
+<style>
+.corner-logo {{
+position: fixed;
+top: 50px;
+right: 20px;
+width: 120px;
+z-index: 9999;
+}}
+</style>
 
-    <img src="{logo_url}" class="corner-logo">
-    """,
-    unsafe_allow_html=True
-)
+<img src="{logo_url}" class="corner-logo">
+""", unsafe_allow_html=True)
 
-st.markdown(
-    """
-    <style>
-    .section-title {
-        font-size: 1.35rem;
-        font-weight: 700;
-        display: inline-flex;
-        align-items: center;
-        gap: .5rem;
-        margin: .25rem 0 .5rem 0;
-    }
-    .info-dot {
-        display:inline-block;
-        font-size: 0.95rem;
-        line-height: 1;
-        padding: .1rem .35rem;
-        border-radius: 999px;
-        border: 1px solid #aaa;
-        color: #333;
-        cursor: help;
-    }
-    .subtle {
-        font-size: 0.95rem;
-        color: #555;
-        margin-top: .25rem;
-    }
-    .small-input .stNumberInput > div > div > input {
-        font-size: .9rem;
-    }
-    .block-container {
-        padding-top: 1rem;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown("""
+<style>
+.section-title {
+font-size: 1.35rem;
+font-weight: 700;
+display: inline-flex;
+align-items: center;
+gap: .5rem;
+margin: .25rem 0 .5rem 0;
+}
+.info-dot {
+display:inline-block;
+font-size: 0.95rem;
+line-height: 1;
+padding: .1rem .35rem;
+border-radius: 999px;
+border: 1px solid #aaa;
+color: #333;
+cursor: help;
+}
+.subtle {
+font-size: 0.95rem;
+color: #555;
+margin-top: .25rem;
+}
+.small-input .stNumberInput > div > div > input {
+font-size: .9rem;
+}
+.block-container { padding-top: 1rem; }
+</style>
+""", unsafe_allow_html=True)
 
 def header_with_tip(text: str, tip: str):
     st.markdown(
@@ -83,7 +75,7 @@ RE_NUM = re.compile(r'[-+]?\d+(?:[.,]\d+)?')
 def to_float(x):
     try:
         return float(str(x).replace(",", "."))
-    except Exception:
+    except:
         return None
 
 def norm(s):
@@ -92,13 +84,13 @@ def norm(s):
     s = str(s)
     s = unicodedata.normalize("NFKD", s)
     s = "".join(ch for ch in s if not unicodedata.combining(ch))
-    return s.lower().strip().replace("’", "'")
+    return s.lower().strip().replace("’","'")
 
 def get_ext(name):
     return os.path.splitext(name)[-1].lower()
 
 def read_all_sheets(name, file_bytes):
-    engine = "xlrd" if get_ext(name) == ".xls" else "openpyxl"
+    engine = "xlrd" if get_ext(name)==".xls" else "openpyxl"
     xls = pd.ExcelFile(io.BytesIO(file_bytes), engine=engine)
     return {
         s: pd.read_excel(io.BytesIO(file_bytes), sheet_name=s, engine=engine, header=None)
@@ -114,24 +106,24 @@ def find_codification_value_below(cod_sheets, label="codification", scan_down=30
         R, C = df.shape
         for r in range(R):
             for c in range(C):
-                if norm(df.iat[r, c]) == target:
-                    for rr in range(r + 1, min(R, r + 1 + scan_down)):
-                        if norm(df.iat[rr, c]) != "":
-                            return sname, str(df.iat[rr, c]).strip(), r, c
+                if norm(df.iat[r,c]) == target:
+                    for rr in range(r+1, min(R, r+1+scan_down)):
+                        if norm(df.iat[rr,c]) != "":
+                            return sname, str(df.iat[rr,c]).strip(), r, c
     return None, None, None, None
 
 def find_stacked_anchor_vertical(df, words, max_gap=10):
     R, C = df.shape
     W = [w.lower() for w in words]
     for c in range(C):
-        starts = [r for r in range(R) if W[0] in norm(df.iat[r, c])]
+        starts = [r for r in range(R) if W[0] in norm(df.iat[r,c])]
         for r0 in starts:
             rcur = r0
             ok = True
             for w in W[1:]:
                 found = False
-                for rr in range(rcur + 1, min(R, rcur + 1 + max_gap)):
-                    if w in norm(df.iat[rr, c]):
+                for rr in range(rcur+1, min(R, rcur+1+max_gap)):
+                    if w in norm(df.iat[rr,c]):
                         rcur = rr
                         found = True
                         break
@@ -144,9 +136,9 @@ def find_stacked_anchor_vertical(df, words, max_gap=10):
 
 def first_number_below(df, start_row, col, right_span=12, down_rows=4):
     R, C = df.shape
-    for rr in range(start_row + 1, min(R, start_row + 1 + down_rows)):
-        for cc in range(col, min(C, col + right_span)):
-            s = "" if pd.isna(df.iat[rr, cc]) else str(df.iat[rr, cc])
+    for rr in range(start_row+1, min(R, start_row+1+down_rows)):
+        for cc in range(col, min(C, col+right_span)):
+            s = "" if pd.isna(df.iat[rr,cc]) else str(df.iat[rr,cc])
 
             m = RE_PM.search(s)
             if m:
@@ -154,9 +146,9 @@ def first_number_below(df, start_row, col, right_span=12, down_rows=4):
                 if v is not None:
                     return v, rr, cc
 
-            if norm(s) in {"±", "+/-"}:
-                for cc2 in range(cc + 1, min(C, cc + 4)):
-                    s2 = "" if pd.isna(df.iat[rr, cc2]) else str(df.iat[rr, cc2])
+            if norm(s) in {"±","+/-"}:
+                for cc2 in range(cc+1, min(C, cc+4)):
+                    s2 = "" if pd.isna(df.iat[rr,cc2]) else str(df.iat[rr,cc2])
                     m2 = RE_NUM.search(s2)
                     if m2:
                         v = to_float(m2.group(0))
@@ -171,10 +163,10 @@ def first_number_below(df, start_row, col, right_span=12, down_rows=4):
     return None, None, None
 
 def two_signed_values_below_same_column(df, start_row, col, max_rows=8):
-    R, _ = df.shape
+    R,_ = df.shape
     vals = []
-    for rr in range(start_row + 1, min(R, start_row + 1 + max_rows)):
-        s = "" if pd.isna(df.iat[rr, col]) else str(df.iat[rr, col]).strip()
+    for rr in range(start_row+1, min(R, start_row+1+max_rows)):
+        s = "" if pd.isna(df.iat[rr,col]) else str(df.iat[rr,col]).strip()
         if RE_SIGNED.match(s):
             x = to_float(s)
             if x is not None:
@@ -183,51 +175,6 @@ def two_signed_values_below_same_column(df, start_row, col, max_rows=8):
         if -v in vals:
             return abs(v), -abs(v)
     return None, None
-
-# ==============================
-# PDJ / TCM extraction
-# ==============================
-def row_numbers(df, r):
-    nums = []
-    row = df.iloc[r, :].tolist()
-    for v in row:
-        s = "" if pd.isna(v) else str(v)
-        for m in RE_NUM.findall(s):
-            x = to_float(m)
-            if x is not None:
-                nums.append(x)
-    return nums
-
-def sheet_numbers(df):
-    nums = []
-    for rr in range(df.shape[0]):
-        nums.extend(row_numbers(df, rr))
-    return nums
-
-def find_key_positions(df, key):
-    pos = []
-    R, C = df.shape
-    for r in range(R):
-        for c in range(C):
-            if str(df.iat[r, c]).strip() == key:
-                pos.append((r, c))
-    return pos
-
-def approx_equal(a, b, tol):
-    return abs(a - b) <= tol
-
-def contains_value_eps(nums, val, tol):
-    return any(approx_equal(x, val, tol) for x in nums)
-
-def contains_pm_pair_eps(nums, mag, tol):
-    return (
-        any(approx_equal(x, abs(mag), tol) for x in nums) and
-        any(approx_equal(x, -abs(mag), tol) for x in nums)
-    )
-
-def fmt_pm(m):
-    s = f"{abs(m):.2f}".rstrip("0").rstrip(".")
-    return f"+/- {s}"
 
 # ==============================
 # App UI
@@ -249,34 +196,59 @@ with st.container():
     )
     st.markdown("</div>", unsafe_allow_html=True)
 
-header_with_tip("Upload COD workbook (.xls/.xlsx)", "Reads COD data")
-cod_file = st.file_uploader("", type=["xls", "xlsx"])
+header_with_tip("Upload COD workbook (.xls/.xlsx)",
+                "Reads Codification, Nominal & Tolerance.")
+cod_file = st.file_uploader("", type=["xls","xlsx"], key="cod")
 
-header_with_tip("Upload PDJ / TCM files", "Multiple files supported")
-other_files = st.file_uploader("", type=["xls", "xlsx"], accept_multiple_files=True)
+header_with_tip("Upload PDJ/TCM/others",
+                "PDJ + TCM → Only check row of key.")
+other_files = st.file_uploader("", type=["xls","xlsx"],
+                               accept_multiple_files=True, key="others")
 
 # ==============================
 # Main logic
 # ==============================
 if cod_file and other_files:
+
     cod_bytes = cod_file.read()
+    cod_file.seek(0)
     cod_sheets = read_all_sheets(cod_file.name, cod_bytes)
 
-    s_cod, key_value, _, _ = find_codification_value_below(cod_sheets)
+    s_cod, key_value, _, _ = find_codification_value_below(cod_sheets, "codification")
     if not key_value:
-        st.error("Codification not found")
+        st.error("Could not find Codification value.")
         st.stop()
+
+    st.markdown(
+        f"<div class='subtle'>🔑 Compared Key: <code>{key_value}</code></div>",
+        unsafe_allow_html=True
+    )
 
     df_cod = cod_sheets[s_cod]
 
-    nr, nc = find_stacked_anchor_vertical(df_cod, ["objectif", "nominal", "jeu"])
+    nr, nc = find_stacked_anchor_vertical(df_cod, ["objectif","nominal","jeu"])
+    if nr is None:
+        st.error("Cannot find Objectif → Nominal → Jeu")
+        st.stop()
+
     cod_nominal, _, _ = first_number_below(df_cod, nr, nc)
+    if cod_nominal is None:
+        st.error("Could not extract Nominal.")
+        st.stop()
 
-    tr, tc = find_stacked_anchor_vertical(df_cod, ["calcul", "disp"])
-    pm, _, _ = first_number_below(df_cod, tr, tc)
-    tol_mag = abs(pm)
+    tr, tc = find_stacked_anchor_vertical(df_cod, ["calcul","disp"])
+    if tr is None:
+        st.error("Cannot find Calcul → Disp.")
+        st.stop()
 
-    st.success("COD reference extracted successfully")
+    posv, negv = two_signed_values_below_same_column(df_cod, tr, tc)
+    if posv is None or negv is None:
+        pm, _, _ = first_number_below(df_cod, tr, tc)
+        if pm is None:
+            st.error("Could not extract Tolerance.")
+            st.stop()
+        tol_mag = abs(pm)
+    else:
+        tol_mag = abs(posv)
 
-    st.write("**Nominal:**", cod_nominal)
-    st.write("**Tolerance:**", fmt_pm(tol_mag))
+    st.success("COD extraction successful")
