@@ -15,11 +15,11 @@ logo_url = "https://raw.githubusercontent.com/Uthraa-18/cod-compare-app/refs/hea
 st.markdown(f"""
 <style>
 .corner-logo {{
-position: fixed;
-top: 50px;
-right: 20px;
-width: 120px;
-z-index: 9999;
+    position: fixed;
+    top: 50px;
+    right: 20px;
+    width: 120px;
+    z-index: 9999;
 }}
 </style>
 
@@ -29,30 +29,30 @@ z-index: 9999;
 st.markdown("""
 <style>
 .section-title {
-font-size: 1.35rem;
-font-weight: 700;
-display: inline-flex;
-align-items: center;
-gap: .5rem;
-margin: .25rem 0 .5rem 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    margin: .25rem 0 .5rem 0;
 }
 .info-dot {
-display:inline-block;
-font-size: 0.95rem;
-line-height: 1;
-padding: .1rem .35rem;
-border-radius: 999px;
-border: 1px solid #aaa;
-color: #333;
-cursor: help;
+    display:inline-block;
+    font-size: 0.95rem;
+    line-height: 1;
+    padding: .1rem .35rem;
+    border-radius: 999px;
+    border: 1px solid #aaa;
+    color: #333;
+    cursor: help;
 }
 .subtle {
-font-size: 0.95rem;
-color: #555;
-margin-top: .25rem;
+    font-size: 0.95rem;
+    color: #555;
+    margin-top: .25rem;
 }
 .small-input .stNumberInput > div > div > input {
-font-size: .9rem;
+    font-size: .9rem;
 }
 .block-container { padding-top: 1rem; }
 </style>
@@ -93,7 +93,12 @@ def read_all_sheets(name, file_bytes):
     engine = "xlrd" if get_ext(name)==".xls" else "openpyxl"
     xls = pd.ExcelFile(io.BytesIO(file_bytes), engine=engine)
     return {
-        s: pd.read_excel(io.BytesIO(file_bytes), sheet_name=s, engine=engine, header=None)
+        s: pd.read_excel(
+            io.BytesIO(file_bytes),
+            sheet_name=s,
+            engine=engine,
+            header=None
+        )
         for s in xls.sheet_names
     }
 
@@ -164,17 +169,92 @@ def first_number_below(df, start_row, col, right_span=12, down_rows=4):
 
 def two_signed_values_below_same_column(df, start_row, col, max_rows=8):
     R,_ = df.shape
-    vals = []
+    vals=[]
     for rr in range(start_row+1, min(R, start_row+1+max_rows)):
         s = "" if pd.isna(df.iat[rr,col]) else str(df.iat[rr,col]).strip()
+
         if RE_SIGNED.match(s):
             x = to_float(s)
             if x is not None:
                 vals.append(x)
+        elif norm(s) in {"±","+/-"} and col+1 < df.shape[1]:
+            s2 = "" if pd.isna(df.iat[rr,col+1]) else str(df.iat[rr,col+1]).strip()
+            if RE_NUM.match(s2):
+                x = to_float(s2)
+                if x:
+                    vals.append(+abs(x))
+                    vals.append(-abs(x))
+
     for v in vals:
         if -v in vals:
-            return abs(v), -abs(v)
+            return +abs(v), -abs(v)
     return None, None
+
+# ==============================
+# Extract numbers from PDJ/TCM rows
+# ==============================
+def row_numbers(df, r):
+    nums=[]
+    row = df.iloc[r,:].tolist()
+
+    for i,v in enumerate(row):
+        s = "" if pd.isna(v) else str(v)
+        for m in RE_PM.findall(s):
+            x = to_float(m)
+            if x:
+                nums += [+abs(x), -abs(x)]
+        if norm(s) in {"±","+/-"}:
+            for j in range(i+1, min(len(row), i+4)):
+                s2 = "" if pd.isna(row[j]) else str(row[j])
+                for m2 in RE_NUM.findall(s2):
+                    x = to_float(m2)
+                    if x:
+                        nums += [+abs(x), -abs(x)]
+
+    for v in row:
+        s = "" if pd.isna(v) else str(v)
+        for m in RE_NUM.findall(s):
+            x = to_float(m)
+            if x is not None:
+                nums.append(x)
+
+    return nums
+
+def sheet_numbers(df):
+    nums=[]
+    for rr in range(df.shape[0]):
+        nums += row_numbers(df, rr)
+    return nums
+
+def find_key_positions(df, key):
+    key = str(key).strip()
+    pos=[]
+    R,C = df.shape
+    for r in range(R):
+        for c in range(C):
+            s = "" if pd.isna(df.iat[r,c]) else str(df.iat[r,c]).strip()
+            if s == key:
+                pos.append((r,c))
+    return pos
+
+# ==============================
+# Matching helpers
+# ==============================
+def approx_equal(a,b,tol):
+    return abs(a-b) <= tol
+
+def contains_value_eps(nums, val, tol):
+    return any( approx_equal(x,val,tol) for x in nums )
+
+def contains_pm_pair_eps(nums, mag, tol):
+    return (
+        any( approx_equal(x,+abs(mag),tol) for x in nums ) and
+        any( approx_equal(x,-abs(mag),tol) for x in nums )
+    )
+
+def fmt_pm(m):
+    s = f"{abs(m):.2f}".rstrip("0").rstrip(".")
+    return f"+/- {s}"
 
 # ==============================
 # App UI
@@ -185,25 +265,33 @@ header_with_tip(
     "What this does",
     "Extracts Nominal & Tolerance from COD and compares PDJ/TCM rows."
 )
-
 st.caption("Epsilon allows 1.41 ≈ 1.4")
 
 with st.container():
     st.markdown("<div class='small-input'>", unsafe_allow_html=True)
     eps = st.number_input(
         "Numeric tolerance (epsilon)",
-        0.0, 0.2, 0.02, 0.01
+        0.0,0.2,0.02,0.01,
+        help="Lets ±1.41 match ±1.4"
     )
     st.markdown("</div>", unsafe_allow_html=True)
 
-header_with_tip("Upload COD workbook (.xls/.xlsx)",
-                "Reads Codification, Nominal & Tolerance.")
+header_with_tip(
+    "Upload COD workbook (.xls/.xlsx)",
+    "Reads Codification, Nominal & Tolerance."
+)
 cod_file = st.file_uploader("", type=["xls","xlsx"], key="cod")
 
-header_with_tip("Upload PDJ/TCM/others",
-                "PDJ + TCM → Only check row of key.")
-other_files = st.file_uploader("", type=["xls","xlsx"],
-                               accept_multiple_files=True, key="others")
+header_with_tip(
+    "Upload PDJ/TCM/others",
+    "PDJ + TCM → Only check row of key."
+)
+other_files = st.file_uploader(
+    "",
+    type=["xls","xlsx"],
+    accept_multiple_files=True,
+    key="others"
+)
 
 # ==============================
 # Main logic
@@ -214,7 +302,7 @@ if cod_file and other_files:
     cod_file.seek(0)
     cod_sheets = read_all_sheets(cod_file.name, cod_bytes)
 
-    s_cod, key_value, _, _ = find_codification_value_below(cod_sheets, "codification")
+    s_cod, key_value, _, _ = find_codification_value_below(cod_sheets,"codification")
     if not key_value:
         st.error("Could not find Codification value.")
         st.stop()
@@ -251,4 +339,132 @@ if cod_file and other_files:
     else:
         tol_mag = abs(posv)
 
-    st.success("COD extraction successful")
+    ref_nom_disp = float(f"{cod_nominal:.2f}")
+    ref_tol_disp = float(f"{tol_mag:.2f}")
+
+    st.write(f"**Reference Nominal (COD):** {ref_nom_disp}")
+    st.write(f"**Reference Tolerance (COD):** {fmt_pm(ref_tol_disp)}")
+
+    # ============================
+    # 4) Compare with other files
+    # ============================
+    results = []
+
+    for f in other_files:
+        f_bytes = f.read()
+        f.seek(0)
+        sheets = read_all_sheets(f.name, f_bytes)
+
+        tag = f.name
+        is_pdj = tag.upper().startswith("PDJ")
+        is_tcm = tag.upper().startswith("TCM")
+
+        for sname, df in sheets.items():
+
+            pos = find_key_positions(df, key_value)
+            if not pos:
+                continue
+
+            for (r, _) in pos:
+
+                if is_pdj or is_tcm:
+                    nums = row_numbers(df, r)
+                else:
+                    row_nums = row_numbers(df, r)
+                    if (
+                        contains_value_eps(row_nums, cod_nominal, eps) or
+                        contains_pm_pair_eps(row_nums, tol_mag, eps)
+                    ):
+                        nums = row_nums
+                    else:
+                        nums = sheet_numbers(df)
+
+                nominal_ok = contains_value_eps(nums, cod_nominal, eps)
+                tol_ok = contains_pm_pair_eps(nums, tol_mag, eps)
+
+                matched=[]
+                if nominal_ok:
+                    matched.append(f"{ref_nom_disp}")
+                if tol_ok:
+                    matched.append(fmt_pm(ref_tol_disp))
+
+                results.append({
+                    "Compared Key": key_value,
+                    "File": tag,
+                    "Sheet": sname,
+                    "Key Row": r+1,
+                    "Reference Nominal": ref_nom_disp,
+                    "Reference Tolerance": fmt_pm(ref_tol_disp),
+                    "Nominal Found": "Yes" if nominal_ok else "No",
+                    "Tolerance Found": "Yes" if tol_ok else "No",
+                    "Matched Numbers": ", ".join(matched)
+                })
+
+    # ============================
+    # 5) Final Table
+    # ============================
+    if results:
+
+        df_out = pd.DataFrame(results)
+
+        def color_yes_no(val):
+            if val == "Yes":
+                return "background-color:#C6F7C6; color:black;"
+            else:
+                return "background-color:#FFB3B3; color:black;"
+
+        styled_df = df_out.style.applymap(
+            color_yes_no,
+            subset=["Nominal Found", "Tolerance Found"]
+        )
+
+        st.write("### 📊 Results")
+        st.dataframe(styled_df, use_container_width=True)
+
+        def create_colored_excel(df):
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Results"
+
+            ws.append(df.columns.tolist())
+
+            green = PatternFill(
+                start_color="C6F7C6",
+                end_color="C6F7C6",
+                fill_type="solid"
+            )
+            red = PatternFill(
+                start_color="FFB3B3",
+                end_color="FFB3B3",
+                fill_type="solid"
+            )
+
+            for row_idx, row_data in df.iterrows():
+                ws.append([row_data[col] for col in df.columns])
+                excel_r = row_idx + 2
+
+                ws.cell(
+                    excel_r,
+                    df.columns.get_loc("Nominal Found")+1
+                ).fill = green if row_data["Nominal Found"] == "Yes" else red
+
+                ws.cell(
+                    excel_r,
+                    df.columns.get_loc("Tolerance Found")+1
+                ).fill = green if row_data["Tolerance Found"] == "Yes" else red
+
+            output = io.BytesIO()
+            wb.save(output)
+            return output.getvalue()
+
+        excel_data = create_colored_excel(df_out)
+
+        st.download_button(
+            "⬇️ Download Excel",
+            excel_data,
+            "cod_comparison_results.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+    else:
+        st.warning("No matches found.")
