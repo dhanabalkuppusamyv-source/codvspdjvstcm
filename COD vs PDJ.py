@@ -342,15 +342,15 @@ other_files = st.file_uploader(
 # Main logic
 # ==============================
 if cod_file and other_files:
-
+    cod_bytes = cod_file.read()
+    cod_file.seek(0)
     cod_temp_path = "/tmp/cod_source.xlsx"
     with open(cod_temp_path, "wb") as f:
         f.write(cod_bytes)
 
     ref_image_path = extract_first_image_from_cod(cod_temp_path)
 
-    cod_bytes = cod_file.read()
-    cod_file.seek(0)
+    
     cod_sheets = read_all_sheets(cod_file.name, cod_bytes)
 
     s_cod, key_value, _, _ = find_codification_value_below(cod_sheets,"codification")
@@ -492,6 +492,8 @@ if cod_file and other_files:
             ws.title = "Results"
 
             ws.append(df.columns.tolist())
+            
+            ref_col_idx = df.columns.get_loc("Ref image") + 1
 
             green = PatternFill(
                 start_color="C6F7C6",
