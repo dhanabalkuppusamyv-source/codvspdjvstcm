@@ -479,7 +479,9 @@ if cod_file and other_files:
                     "PDJ Tolerance Value": pdj_tolerance_val,
 
                     "TCM Nominal Value":
-                        actual_nominal_found if actual_nominal_found is not None else "",
+                        actual_nominal_found
+                        if actual_nominal_found is not None
+                        else (nums[0] if nums else ""),
                     "TCM Tolerance Value":
                         fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
