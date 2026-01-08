@@ -4,7 +4,6 @@ import numpy as np
 import os, io, re, unicodedata
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill
-from openpyxl.styles import Border, Side
 
 
 # ==============================
@@ -66,6 +65,28 @@ def header_with_tip(text: str, tip: str):
         f"<span class='info-dot' title='{tip}'>ⓘ</span></div>",
         unsafe_allow_html=True
     )
+
+def extract_actual_nominal(nums):
+    """Return first numeric value found in row (nominal)."""
+    for x in nums:
+        return x
+    return None
+
+
+def extract_actual_tolerance(nums):
+    """
+    Return tolerance if present:
+    - Prefer ± pair
+    - Else single positive value
+    """
+    for x in nums:
+        if -x in nums:
+            return abs(x)
+    for x in nums:
+        if x > 0:
+            return abs(x)
+    return None
+
 
 # ==============================
 # Regex & utilities
@@ -383,6 +404,8 @@ if cod_file and other_files:
 
                 nominal_ok = contains_value_eps(nums, cod_nominal, eps)
                 tol_ok = contains_pm_pair_eps(nums, tol_mag, eps)
+                actual_nominal_found = extract_actual_nominal(nums)
+                actual_tolerance_found = extract_actual_tolerance(nums)
 
                 matched=[]
                 if nominal_ok:
@@ -399,7 +422,16 @@ if cod_file and other_files:
                     "COD Tolerance": fmt_pm(ref_tol_disp),
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
                     "Actual Tolerance Found ?": "Yes" if tol_ok else "No",
-                    "OK - Nominal and Tolerance value": ", ".join(matched)
+                    "OK - Nominal and Tolerance value": ", ".join(matched),
+                    "Actual Nominal Value Found":
+                        actual_nominal_found if actual_nominal_found is not None else "",
+
+                    "Actual Tolerance Value Found":
+                        fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
+
+                    "Tolerance Mismatch Value":
+                        fmt_pm(actual_tolerance_found)
+                        if actual_tolerance_found is not None and not tol_ok else "",
                 })
 
     # ============================
@@ -431,10 +463,6 @@ if cod_file and other_files:
             ws.title = "Results"
 
             ws.append(df.columns.tolist())
-            for c in range(1, len(df.columns) + 1):
-                ws.cell(1, c).border = border
-            thin = Side(style="thin")
-            border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
             green = PatternFill(
                 start_color="C6F7C6",
@@ -449,10 +477,6 @@ if cod_file and other_files:
 
             for row_idx, row_data in df.iterrows():
                 ws.append([row_data[col] for col in df.columns])
-                excel_r = ws.max_row
-                for c in range(1, len(df.columns) + 1):
-                    ws.cell(excel_r, c).border = border
-
                 excel_r = row_idx + 2
 
                 ws.cell(
