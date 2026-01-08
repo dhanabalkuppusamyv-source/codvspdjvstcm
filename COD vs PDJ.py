@@ -4,6 +4,9 @@ import numpy as np
 import os, io, re, unicodedata
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill
+from openpyxl import load_workbook
+from openpyxl.drawing.image import Image as XLImage
+
 
 
 # ==============================
@@ -86,6 +89,25 @@ def extract_actual_tolerance(nums):
         if x > 0:
             return abs(x)
     return None
+
+def extract_first_image_from_cod(cod_file_path):
+    """
+    Extracts first image from first sheet of COD file.
+    Returns path to saved image or None.
+    """
+    wb = load_workbook(cod_file_path)
+    ws = wb.active
+
+    if not hasattr(ws, "_images") or not ws._images:
+        return None
+
+    img = ws._images[0]   # take first image
+    img_path = "/tmp/ref_image.png"
+    img.ref = None        # avoid write conflict
+    img._id = None
+
+    img.image.save(img_path)
+    return img_path
 
 
 # ==============================
@@ -321,6 +343,12 @@ other_files = st.file_uploader(
 # ==============================
 if cod_file and other_files:
 
+    cod_temp_path = "/tmp/cod_source.xlsx"
+    with open(cod_temp_path, "wb") as f:
+        f.write(cod_bytes)
+
+    ref_image_path = extract_first_image_from_cod(cod_temp_path)
+
     cod_bytes = cod_file.read()
     cod_file.seek(0)
     cod_sheets = read_all_sheets(cod_file.name, cod_bytes)
@@ -440,9 +468,10 @@ if cod_file and other_files:
     if results:
 
         df_out = pd.DataFrame(results)
+        df_out["Ref image"] = ""
         # Add SI.No as first column
         df_out.insert(0, "SI.No", range(1, len(df_out) + 1))
-
+        
         def color_yes_no(val):
             if val == "Yes":
                 return "background-color:#C6F7C6; color:black;"
@@ -477,7 +506,7 @@ if cod_file and other_files:
 
             for row_idx, row_data in df.iterrows():
                 ws.append([row_data[col] for col in df.columns])
-                excel_r = row_idx + 2
+                excel_r = ws.max_row
 
                 ws.cell(
                     excel_r,
@@ -488,6 +517,15 @@ if cod_file and other_files:
                     excel_r,
                     df.columns.get_loc("Actual Tolerance Found ?")+1
                 ).fill = green if row_data["Actual Tolerance Found ?"] == "Yes" else red
+
+                if ref_image_path:
+                    img = XLImage(ref_image_path)
+                    img.width = 120
+                    img.height = 80
+                    ws.add_image(img, ws.cell(excel_r, ref_col_idx).coordinate)
+
+                    ws.row_dimensions[excel_r].height = 70
+                    ws.column_dimensions[chr(64+ref_col_idx)].width = 22
 
             output = io.BytesIO()
             wb.save(output)
