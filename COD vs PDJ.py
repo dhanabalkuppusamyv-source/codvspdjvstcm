@@ -120,29 +120,36 @@ def extract_tcm_nominal(nums):
     candidates = [x for x in nums if x not in tolerance_vals]
 
     return candidates[0] if candidates else ""
-def extract_tcm_nominal(nums, cod_nominal, eps):
+def extract_tcm_nominal_from_row(df, row_idx, key_value):
     """
-    Extract actual TCM nominal value:
-    - Ignore tolerance (± pairs)
-    - Ignore COD nominal
-    - Return remaining numeric value
+    Extract TCM nominal value from the same row as key:
+    - Ignore tolerance values
+    - Return first valid measurement number
     """
-    tolerance_vals = set()
-    for x in nums:
-        if -x in nums:
-            tolerance_vals.add(x)
-            tolerance_vals.add(-x)
+    row = df.iloc[row_idx, :]
 
-    candidates = []
-    for x in nums:
-        if x in tolerance_vals:
+    for cell in row:
+        if pd.isna(cell):
             continue
-        if approx_equal(x, cod_nominal, eps):
+
+        s = str(cell)
+
+        # Skip the key itself
+        if key_value in s:
             continue
-        candidates.append(x)
 
-    return candidates[0] if candidates else ""
+        # Skip tolerance symbols
+        if "±" in s or "+/-" in s:
+            continue
 
+        # Extract clean numeric values
+        matches = re.findall(RE_NUM, s)
+        for m in matches:
+            val = to_float(m)
+            if val is not None and val < 10:  # measurement sanity check
+                return val
+
+    return ""
 
 
 def extract_all_images_from_cod(cod_file_path):
@@ -494,7 +501,7 @@ if cod_file and other_files:
                 tcm_nominal_val = ""
 
                 if is_tcm:
-                    tcm_nominal_val = extract_tcm_nominal(nums, cod_nominal, eps)
+                    tcm_nominal_val = extract_tcm_nominal_from_row(df, r, key_value)
 
                 actual_tolerance_found = extract_actual_tolerance(nums)
 
