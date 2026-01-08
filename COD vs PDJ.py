@@ -91,6 +91,21 @@ def extract_actual_tolerance(nums):
             return abs(x)
     return None
 
+def extract_pdj_nominal(nums, cod_nominal, eps):
+    """Return PDJ nominal value matching COD nominal"""
+    for x in nums:
+        if approx_equal(x, cod_nominal, eps):
+            return x
+    return ""
+
+def extract_pdj_tolerance(nums):
+    """Return PDJ tolerance (± value) if present"""
+    for x in nums:
+        if -x in nums:
+            return fmt_pm(abs(x))
+    return ""
+
+
 def extract_all_images_from_cod(cod_file_path):
     wb = load_workbook(cod_file_path)
     ws = wb.active
@@ -445,6 +460,13 @@ if cod_file and other_files:
                     matched.append(f"{ref_nom_disp}")
                 if tol_ok:
                     matched.append(fmt_pm(ref_tol_disp))
+                pdj_nominal_val = ""
+                pdj_tolerance_val = ""
+
+                if is_pdj:
+                    pdj_nominal_val = extract_pdj_nominal(nums, cod_nominal, eps)
+                    pdj_tolerance_val = extract_pdj_tolerance(nums)
+
 
                 results.append({
                     "Compared Key": key_value,
@@ -453,6 +475,8 @@ if cod_file and other_files:
                     "Key Row": r+1,
                     "COD Nominal": ref_nom_disp,
                     "COD Tolerance": fmt_pm(ref_tol_disp),
+                    "PDJ Nominal Value": pdj_nominal_val,
+                    "PDJ Tolerance Value": pdj_tolerance_val,
                     "TCM Nominal Value":
                         actual_nominal_found if actual_nominal_found is not None else "",
                     "TCM Tolerance Value":
