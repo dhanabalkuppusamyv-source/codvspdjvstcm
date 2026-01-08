@@ -536,7 +536,7 @@ if cod_file and other_files:
                     img.height = 90
                     ws.add_image(img, f"{col_letter}{start_row}")
                     ws.row_dimensions[start_row].height = 80
-                    start_row += 6  # stack images vertically
+                    start_row += 1  # stack images vertically
 
                 ws.column_dimensions[col_letter].width = 25
 
