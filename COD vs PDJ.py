@@ -96,15 +96,21 @@ def extract_all_images_from_cod(cod_file_path):
     ws = wb.active
 
     images = []
-    if hasattr(ws, "_images"):
-        for i, img in enumerate(ws._images):
-            img_path = f"/tmp/ref_image_{i}.png"
-            img.ref = None
-            img._id = None
-            img.image.save(img_path)
-            images.append(img_path)
+
+    if not hasattr(ws, "_images"):
+        return images
+
+    for i, img in enumerate(ws._images):
+        img_path = f"/tmp/ref_image_{i}.png"
+
+        # 🔥 Correct way: write raw image bytes
+        with open(img_path, "wb") as f:
+            f.write(img._data())
+
+        images.append(img_path)
 
     return images
+
 
 
 
