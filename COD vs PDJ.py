@@ -70,10 +70,10 @@ def header_with_tip(text: str, tip: str):
         unsafe_allow_html=True
     )
 
-def extract_actual_nominal(nums):
-    """Return first numeric value found in row (nominal)."""
+def extract_actual_nominal(nums, cod_nominal, eps):
     for x in nums:
-        return x
+        if approx_equal(x, cod_nominal, eps):
+            return x
     return None
 
 
@@ -437,7 +437,7 @@ if cod_file and other_files:
 
                 nominal_ok = contains_value_eps(nums, cod_nominal, eps)
                 tol_ok = contains_pm_pair_eps(nums, tol_mag, eps)
-                actual_nominal_found = extract_actual_nominal(nums)
+                actual_nominal_found = extract_actual_nominal(nums, cod_nominal, eps)
                 actual_tolerance_found = extract_actual_tolerance(nums)
 
                 matched=[]
