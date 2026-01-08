@@ -348,7 +348,9 @@ if cod_file and other_files:
     with open(cod_temp_path, "wb") as f:
         f.write(cod_bytes)
 
-    ref_image_path = extract_first_image_from_cod(cod_temp_path)
+    ref_image_path = None
+    if cod_file.name.lower().endswith(".xlsx"):
+        ref_image_path = extract_first_image_from_cod(cod_temp_path)
 
     
     cod_sheets = read_all_sheets(cod_file.name, cod_bytes)
@@ -492,7 +494,7 @@ if cod_file and other_files:
             ws.title = "Results"
 
             ws.append(df.columns.tolist())
-            
+
             ref_col_idx = df.columns.get_loc("Ref image") + 1
 
             green = PatternFill(
