@@ -120,6 +120,28 @@ def extract_tcm_nominal(nums):
     candidates = [x for x in nums if x not in tolerance_vals]
 
     return candidates[0] if candidates else ""
+def extract_tcm_nominal(nums, cod_nominal, eps):
+    """
+    Extract actual TCM nominal value:
+    - Ignore tolerance (± pairs)
+    - Ignore COD nominal
+    - Return remaining numeric value
+    """
+    tolerance_vals = set()
+    for x in nums:
+        if -x in nums:
+            tolerance_vals.add(x)
+            tolerance_vals.add(-x)
+
+    candidates = []
+    for x in nums:
+        if x in tolerance_vals:
+            continue
+        if approx_equal(x, cod_nominal, eps):
+            continue
+        candidates.append(x)
+
+    return candidates[0] if candidates else ""
 
 
 
@@ -472,7 +494,7 @@ if cod_file and other_files:
                 tcm_nominal_val = ""
 
                 if is_tcm:
-                    tcm_nominal_val = extract_tcm_nominal(nums)
+                    tcm_nominal_val = extract_tcm_nominal(nums, cod_nominal, eps)
 
                 actual_tolerance_found = extract_actual_tolerance(nums)
 
