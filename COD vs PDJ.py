@@ -6,6 +6,7 @@ from openpyxl import Workbook
 from openpyxl.styles import PatternFill
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image as XLImage
+from openpyxl.utils import get_column_letter
 
 
 
@@ -92,22 +93,25 @@ def extract_actual_tolerance(nums):
 
 def extract_first_image_from_cod(cod_file_path):
     """
-    Extracts first image from first sheet of COD file.
-    Returns path to saved image or None.
+    Extract first embedded image from an .xlsx COD file.
+    Returns image file path or None.
     """
     wb = load_workbook(cod_file_path)
     ws = wb.active
 
-    if not hasattr(ws, "_images") or not ws._images:
+    if not hasattr(ws, "_images") or len(ws._images) == 0:
         return None
 
-    img = ws._images[0]   # take first image
-    img_path = "/tmp/ref_image.png"
-    img.ref = None        # avoid write conflict
-    img._id = None
+    img = ws._images[0]
 
-    img.image.save(img_path)
+    img_path = "/tmp/ref_image.png"
+
+    # ✅ Correct way: write raw image bytes
+    with open(img_path, "wb") as f:
+        f.write(img._data())
+
     return img_path
+
 
 
 # ==============================
@@ -529,7 +533,7 @@ if cod_file and other_files:
                     ws.add_image(img, ws.cell(excel_r, ref_col_idx).coordinate)
 
                     ws.row_dimensions[excel_r].height = 70
-                    ws.column_dimensions[chr(64+ref_col_idx)].width = 22
+                    ws.column_dimensions[get_column_letter(ref_col_idx)].width = 22
 
             output = io.BytesIO()
             wb.save(output)
