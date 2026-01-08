@@ -105,52 +105,6 @@ def extract_pdj_tolerance(nums):
             return fmt_pm(abs(x))
     return ""
 
-def extract_tcm_nominal(nums):
-    """
-    Extract actual TCM nominal value:
-    - Ignore tolerance (± pairs)
-    - Return first remaining numeric value
-    """
-    tolerance_vals = set()
-    for x in nums:
-        if -x in nums:
-            tolerance_vals.add(x)
-            tolerance_vals.add(-x)
-
-    candidates = [x for x in nums if x not in tolerance_vals]
-
-    return candidates[0] if candidates else ""
-def extract_tcm_nominal_from_row(df, row_idx, key_value):
-    """
-    Extract TCM nominal value from the same row as key:
-    - Ignore tolerance values
-    - Return first valid measurement number
-    """
-    row = df.iloc[row_idx, :]
-
-    for cell in row:
-        if pd.isna(cell):
-            continue
-
-        s = str(cell)
-
-        # Skip the key itself
-        if key_value in s:
-            continue
-
-        # Skip tolerance symbols
-        if "±" in s or "+/-" in s:
-            continue
-
-        # Extract clean numeric values
-        matches = re.findall(RE_NUM, s)
-        for m in matches:
-            val = to_float(m)
-            if val is not None and val < 10:  # measurement sanity check
-                return val
-
-    return ""
-
 
 def extract_all_images_from_cod(cod_file_path):
     wb = load_workbook(cod_file_path)
@@ -498,11 +452,7 @@ if cod_file and other_files:
 
                 nominal_ok = contains_value_eps(nums, cod_nominal, eps)
                 tol_ok = contains_pm_pair_eps(nums, tol_mag, eps)
-                tcm_nominal_val = ""
-
-                if is_tcm:
-                    tcm_nominal_val = extract_tcm_nominal_from_row(df, r, key_value)
-
+                actual_nominal_found = extract_actual_nominal(nums, cod_nominal, eps)
                 actual_tolerance_found = extract_actual_tolerance(nums)
 
                 matched=[]
@@ -527,7 +477,9 @@ if cod_file and other_files:
                     "COD Tolerance": fmt_pm(ref_tol_disp),
                     "PDJ Nominal Value": pdj_nominal_val,
                     "PDJ Tolerance Value": pdj_tolerance_val,
-                    "TCM Nominal Value": tcm_nominal_val,
+
+                    "TCM Nominal Value":
+                        actual_nominal_found if actual_nominal_found is not None else "",
                     "TCM Tolerance Value":
                         fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
