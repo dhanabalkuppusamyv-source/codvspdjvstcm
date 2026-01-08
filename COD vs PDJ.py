@@ -456,13 +456,13 @@ if cod_file and other_files:
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
                     "Actual Tolerance Found ?": "Yes" if tol_ok else "No",
                     "OK - Nominal and Tolerance value": ", ".join(matched),
-                    "Actual Nominal Value Found":
+                    "TCM Nominal Value":
                         actual_nominal_found if actual_nominal_found is not None else "",
 
-                    "Actual Tolerance Value Found":
+                    "TCM Tolerance Value":
                         fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
 
-                    "Tolerance Mismatch Value":
+                    "Not-OK Value":
                         fmt_pm(actual_tolerance_found)
                         if actual_tolerance_found is not None and not tol_ok else "",
                 })
