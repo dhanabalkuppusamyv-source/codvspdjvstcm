@@ -91,26 +91,21 @@ def extract_actual_tolerance(nums):
             return abs(x)
     return None
 
-def extract_first_image_from_cod(cod_file_path):
-    """
-    Extract first embedded image from an .xlsx COD file.
-    Returns image file path or None.
-    """
+def extract_all_images_from_cod(cod_file_path):
     wb = load_workbook(cod_file_path)
     ws = wb.active
 
-    if not hasattr(ws, "_images") or len(ws._images) == 0:
-        return None
+    images = []
+    if hasattr(ws, "_images"):
+        for i, img in enumerate(ws._images):
+            img_path = f"/tmp/ref_image_{i}.png"
+            img.ref = None
+            img._id = None
+            img.image.save(img_path)
+            images.append(img_path)
 
-    img = ws._images[0]
+    return images
 
-    img_path = "/tmp/ref_image.png"
-
-    # ✅ Correct way: write raw image bytes
-    with open(img_path, "wb") as f:
-        f.write(img._data())
-
-    return img_path
 
 
 
@@ -350,11 +345,9 @@ if cod_file and other_files:
     cod_file.seek(0)
     cod_temp_path = "/tmp/cod_source.xlsx"
     with open(cod_temp_path, "wb") as f:
-        f.write(cod_bytes)
+        f.write(cod_file.read())
 
-    ref_image_path = None
-    if cod_file.name.lower().endswith(".xlsx"):
-        ref_image_path = extract_first_image_from_cod(cod_temp_path)
+    ref_image_paths = extract_all_images_from_cod(cod_temp_path)
 
     
     cod_sheets = read_all_sheets(cod_file.name, cod_bytes)
@@ -500,6 +493,7 @@ if cod_file and other_files:
             ws.append(df.columns.tolist())
 
             ref_col_idx = df.columns.get_loc("Ref image") + 1
+            first_data_row = 2
 
             green = PatternFill(
                 start_color="C6F7C6",
@@ -526,15 +520,20 @@ if cod_file and other_files:
                     df.columns.get_loc("Actual Tolerance Found ?")+1
                 ).fill = green if row_data["Actual Tolerance Found ?"] == "Yes" else red
 
-                if ref_image_path:
-                    img = XLImage(ref_image_path)
-                    img.width = 120
-                    img.height = 80
-                    ws.add_image(img, ws.cell(excel_r, ref_col_idx).coordinate)
-
-                    ws.row_dimensions[excel_r].height = 70
-                    ws.column_dimensions[get_column_letter(ref_col_idx)].width = 22
-
+            if ref_image_paths:
+                col_letter = ws.cell(1, ref_col_idx).column_letter
+                start_row = first_data_row
+        
+                for img_path in ref_image_paths:
+                    img = XLImage(img_path)
+                    img.width = 140
+                    img.height = 90
+                    ws.add_image(img, f"{col_letter}{start_row}")
+                    ws.row_dimensions[start_row].height = 80
+                    start_row += 6  # stack images vertically
+        
+                ws.column_dimensions[col_letter].width = 25
+                
             output = io.BytesIO()
             wb.save(output)
             return output.getvalue()
