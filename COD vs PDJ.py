@@ -342,10 +342,10 @@ other_files = st.file_uploader(
 # ==============================
 if cod_file and other_files:
     cod_bytes = cod_file.read()
-    cod_file.seek(0)
+
     cod_temp_path = "/tmp/cod_source.xlsx"
     with open(cod_temp_path, "wb") as f:
-        f.write(cod_file.read())
+        f.write(cod_bytes)
 
     ref_image_paths = extract_all_images_from_cod(cod_temp_path)
 
@@ -523,7 +523,7 @@ if cod_file and other_files:
             if ref_image_paths:
                 col_letter = ws.cell(1, ref_col_idx).column_letter
                 start_row = first_data_row
-        
+
                 for img_path in ref_image_paths:
                     img = XLImage(img_path)
                     img.width = 140
@@ -531,9 +531,9 @@ if cod_file and other_files:
                     ws.add_image(img, f"{col_letter}{start_row}")
                     ws.row_dimensions[start_row].height = 80
                     start_row += 6  # stack images vertically
-        
+
                 ws.column_dimensions[col_letter].width = 25
-                
+
             output = io.BytesIO()
             wb.save(output)
             return output.getvalue()
