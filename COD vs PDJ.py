@@ -7,7 +7,7 @@ from openpyxl.styles import PatternFill
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils import get_column_letter
-
+from openpyxl.styles import Border, Side
 
 
 # ==============================
@@ -70,10 +70,10 @@ def header_with_tip(text: str, tip: str):
         unsafe_allow_html=True
     )
 
-def extract_actual_nominal(nums):
-    """Return first numeric value found in row (nominal)."""
+def extract_actual_nominal(nums, cod_nominal, eps):
     for x in nums:
-        return x
+        if approx_equal(x, cod_nominal, eps):
+            return x
     return None
 
 
@@ -90,6 +90,21 @@ def extract_actual_tolerance(nums):
         if x > 0:
             return abs(x)
     return None
+
+def extract_pdj_nominal(nums, cod_nominal, eps):
+    """Return PDJ nominal value matching COD nominal"""
+    for x in nums:
+        if approx_equal(x, cod_nominal, eps):
+            return x
+    return ""
+
+def extract_pdj_tolerance(nums):
+    """Return PDJ tolerance (± value) if present"""
+    for x in nums:
+        if -x in nums:
+            return fmt_pm(abs(x))
+    return ""
+
 
 def extract_all_images_from_cod(cod_file_path):
     wb = load_workbook(cod_file_path)
@@ -437,7 +452,7 @@ if cod_file and other_files:
 
                 nominal_ok = contains_value_eps(nums, cod_nominal, eps)
                 tol_ok = contains_pm_pair_eps(nums, tol_mag, eps)
-                actual_nominal_found = extract_actual_nominal(nums)
+                actual_nominal_found = extract_actual_nominal(nums, cod_nominal, eps)
                 actual_tolerance_found = extract_actual_tolerance(nums)
 
                 matched=[]
@@ -445,6 +460,13 @@ if cod_file and other_files:
                     matched.append(f"{ref_nom_disp}")
                 if tol_ok:
                     matched.append(fmt_pm(ref_tol_disp))
+                pdj_nominal_val = ""
+                pdj_tolerance_val = ""
+
+                if is_pdj:
+                    pdj_nominal_val = extract_pdj_nominal(nums, cod_nominal, eps)
+                    pdj_tolerance_val = extract_pdj_tolerance(nums)
+
 
                 results.append({
                     "Compared Key": key_value,
@@ -453,15 +475,15 @@ if cod_file and other_files:
                     "Key Row": r+1,
                     "COD Nominal": ref_nom_disp,
                     "COD Tolerance": fmt_pm(ref_tol_disp),
+                    "PDJ Nominal Value": pdj_nominal_val,
+                    "PDJ Tolerance Value": pdj_tolerance_val,
+                    "TCM Nominal Value":
+                        actual_nominal_found if actual_nominal_found is not None else "",
+                    "TCM Tolerance Value":
+                        fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
                     "Actual Tolerance Found ?": "Yes" if tol_ok else "No",
                     "OK - Nominal and Tolerance value": ", ".join(matched),
-                    "TCM Nominal Value":
-                        actual_nominal_found if actual_nominal_found is not None else "",
-
-                    "TCM Tolerance Value":
-                        fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
-
                     "Not-OK Value":
                         fmt_pm(actual_tolerance_found)
                         if actual_tolerance_found is not None and not tol_ok else "",
@@ -492,11 +514,19 @@ if cod_file and other_files:
         st.dataframe(styled_df, use_container_width=True)
 
         def create_colored_excel(df):
+            
             wb = Workbook()
             ws = wb.active
             ws.title = "Results"
-
+            # Border
+            thin = Side(style="thin")
+            border = Border(left=thin, right=thin, top=thin, bottom=thin)
+            # Header
             ws.append(df.columns.tolist())
+
+            for c in range(1, len(df.columns) + 1):
+                ws.cell(row=1, column=c).border = border
+
 
             ref_col_idx = df.columns.get_loc("Ref image") + 1
             first_data_row = 2
@@ -515,6 +545,9 @@ if cod_file and other_files:
             for row_idx, row_data in df.iterrows():
                 ws.append([row_data[col] for col in df.columns])
                 excel_r = ws.max_row
+
+                for c in range(1, len(df.columns) + 1):
+                    ws.cell(row=excel_r, column=c).border = border
 
                 ws.cell(
                     excel_r,
