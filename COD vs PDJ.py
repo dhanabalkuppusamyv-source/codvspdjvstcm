@@ -285,16 +285,6 @@ def row_numbers(df, r):
 
     return nums
 
-def first_numeric_below(df, r, down_rows=10):
-    R = df.shape[0]
-    for rr in range(r + 1, min(R, r + down_rows + 1)):
-        nums = row_numbers(df, rr)
-        if nums:
-            return nums[0]
-    return None
-
-
-
 def sheet_numbers(df):
     nums=[]
     for rr in range(df.shape[0]):
@@ -448,15 +438,8 @@ if cod_file and other_files:
 
             for (r, _) in pos:
 
-                if is_pdj:
+                if is_pdj or is_tcm:
                     nums = row_numbers(df, r)
-
-                elif is_tcm:
-                    # FULL sheet scan (required by you)
-                    nums = sheet_numbers(df)
-
-                        # Prefer measurement values below key row for printing
-                    tcm_nominal_preferred = first_numeric_below(df, r)
                 else:
                     row_nums = row_numbers(df, r)
                     if (
@@ -496,9 +479,9 @@ if cod_file and other_files:
                     "PDJ Tolerance Value": pdj_tolerance_val,
 
                     "TCM Nominal Value":
-                        tcm_nominal_preferred
-                        if is_tcm and tcm_nominal_preferred is not None
-                        else (nums[0] if is_tcm and nums else actual_nominal_found or ""),
+                        actual_nominal_found
+                        if actual_nominal_found is not None
+                        else (nums[0] if nums else ""),
                     "TCM Tolerance Value":
                         fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
