@@ -128,8 +128,6 @@ def extract_all_images_from_cod(cod_file_path):
 
 
 
-
-
 # ==============================
 # Regex & utilities
 # ==============================
@@ -321,6 +319,10 @@ def fmt_pm(m):
     s = f"{abs(m):.2f}".rstrip("0").rstrip(".")
     return f"+/- {s}"
 
+def fmt_num(v):
+    s = f"{v:.2f}".rstrip("0").rstrip(".")
+    return s
+
 # ==============================
 # App UI
 # ==============================
@@ -455,6 +457,32 @@ if cod_file and other_files:
                 actual_nominal_found = extract_actual_nominal(nums, cod_nominal, eps)
                 actual_tolerance_found = extract_actual_tolerance(nums)
 
+                # --- NEW: collect all TCM nominal candidates from the row (exclude tolerance mag) ---
+                # Build a list of positive numeric candidates (abs for ± pairs),
+                # exclude numbers that match the detected tolerance magnitude,
+                # deduplicate using epsilon.
+                tcm_nominal_values = []
+                if nums:
+                    for x in nums:
+                        if x is None:
+                            continue
+                        # consider positive magnitude candidates only (nominals typically positive)
+                        mag = abs(x)
+                        # skip if this number is the tolerance magnitude
+                        if actual_tolerance_found is not None and approx_equal(mag, abs(actual_tolerance_found), eps):
+                            continue
+                        # keep positive numbers (avoid listing negative sign duplicates)
+                        if mag >= 0:
+                            # dedupe with approx_equal
+                            if not any(approx_equal(mag, v, eps) for v in tcm_nominal_values):
+                                tcm_nominal_values.append(mag)
+
+                # Format for display
+                if tcm_nominal_values:
+                    tcm_nominal_str = ", ".join(fmt_num(v) for v in tcm_nominal_values)
+                else:
+                    tcm_nominal_str = ""
+
                 matched=[]
                 if nominal_ok:
                     matched.append(f"{ref_nom_disp}")
@@ -478,7 +506,8 @@ if cod_file and other_files:
                     "PDJ Nominal Value": pdj_nominal_val,
                     "PDJ Tolerance Value": pdj_tolerance_val,
                     "TCM Nominal Value":
-                        actual_nominal_found if actual_nominal_found is not None else "",
+                        # previously only showed matching nominal; now show all numeric candidates on the row
+                        tcm_nominal_str,
                     "TCM Tolerance Value":
                         fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
