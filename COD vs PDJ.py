@@ -442,27 +442,31 @@ if cod_file and other_files:
             for (r, _) in pos:
 
                 if is_pdj:
-                    nums = row_numbers(df, r)
+                    validation_nums = row_numbers(df, r)
+                    tcm_row_nums = []
                 elif is_tcm:
                     # FULL sheet scan for validation
-                    nums = sheet_numbers(df)
+                    validation_nums = sheet_numbers(df)
 
                     # Correct TCM nominal (from key row itself)
-                    tcm_nominal_row_value = first_numeric_in_row(df, r)
+                    tcm_row_nums = row_numbers(df, r)
                 else:
                     row_nums = row_numbers(df, r)
                     if (
                         contains_value_eps(row_nums, cod_nominal, eps) or
                         contains_pm_pair_eps(row_nums, tol_mag, eps)
                     ):
-                        nums = row_nums
+                        validation_nums = row_nums
                     else:
-                        nums = sheet_numbers(df)
+                        validation_nums = sheet_numbers(df)
+                    tcm_row_nums = []
 
-                nominal_ok = contains_value_eps(nums, cod_nominal, eps)
-                tol_ok = contains_pm_pair_eps(nums, tol_mag, eps)
-                actual_nominal_found = extract_actual_nominal(nums, cod_nominal, eps)
-                actual_tolerance_found = extract_actual_tolerance(nums)
+                nominal_ok = contains_value_eps(validation_nums, cod_nominal, eps)
+                tol_ok = contains_pm_pair_eps(validation_nums, tol_mag, eps)
+
+                actual_nominal_found = extract_actual_nominal(validation_nums, cod_nominal, eps)
+                actual_tolerance_found = extract_actual_tolerance(validation_nums)
+
 
                 matched=[]
                 if nominal_ok:
@@ -487,9 +491,12 @@ if cod_file and other_files:
                     "PDJ Nominal Value": pdj_nominal_val,
                     "PDJ Tolerance Value": pdj_tolerance_val,
                     "TCM Nominal Value":
-                        tcm_nominal_row_value if is_tcm else actual_nominal_found,
+                        tcm_row_nums[0] if is_tcm and tcm_row_nums else "",
                     "TCM Tolerance Value":
-                        fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
+                        fmt_pm(extract_actual_tolerance(tcm_row_nums))
+                        if is_tcm and extract_actual_tolerance(tcm_row_nums) is not None
+                        else "",
+
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
                     "Actual Tolerance Found ?": "Yes" if tol_ok else "No",
                     "OK - Nominal and Tolerance value": ", ".join(matched),
