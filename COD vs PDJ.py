@@ -459,19 +459,19 @@ if cod_file and other_files:
 
                 # --- Updated logic:
                 # collect numeric tokens from the key row in appearance order,
-                # dedupe near-equals, then keep:
-                #   - any fractional numbers (e.g. 1.2, 6.5, 2.5)
-                #   - OR any number that matches the COD nominal (within eps)
-                # BUT exclude any token that equals the detected tolerance magnitude for that row.
+                # track explicit ± tokens (pm_tokens) so we can exclude them later.
                 row = df.iloc[r, :].tolist()
                 ordered_nums = []
+                pm_tokens = []
                 for cell in row:
                     s = "" if pd.isna(cell) else str(cell)
-                    # capture explicit ± patterns first (gives magnitude)
+                    # capture explicit ± patterns first (gives magnitude) and mark them as tolerance tokens
                     for m in RE_PM.findall(s):
                         x = to_float(m)
                         if x is not None:
-                            ordered_nums.append(abs(x))
+                            mag = abs(x)
+                            ordered_nums.append(mag)
+                            pm_tokens.append(mag)
                     # then capture other numeric occurrences in the text in order
                     for m in RE_NUM.finditer(s):
                         x = to_float(m.group(0))
@@ -490,11 +490,11 @@ if cod_file and other_files:
                     # True if value is not approximately an integer (uses eps)
                     return not approx_equal(val, round(val), eps_local)
 
-                # keep fractional values OR COD-matching values, but exclude tolerance magnitude
+                # keep fractional values OR COD-matching values, but exclude any pm_tokens (detected tolerance magnitudes)
                 tcm_nominal_values = []
                 for x in tcm_all_values:
-                    # skip tokens that match the detected tolerance for this row
-                    if actual_tolerance_found is not None and approx_equal(x, actual_tolerance_found, eps):
+                    # skip tokens that match any detected ± token on the row
+                    if any(approx_equal(x, pm, eps) for pm in pm_tokens):
                         continue
                     if is_fractional(x, eps) or approx_equal(x, cod_nominal, eps):
                         if not any(approx_equal(x, v, eps) for v in tcm_nominal_values):
@@ -527,7 +527,7 @@ if cod_file and other_files:
                     "PDJ Tolerance Value": pdj_tolerance_val,
                     "TCM Nominal Value":
                         # show fractional numbers + any value equal to COD nominal (appearance order),
-                        # but exclude the detected tolerance magnitude
+                        # but exclude explicit ± tokens (pm_tokens) so tolerances like 0.5 are not listed
                         tcm_nominal_str,
                     "TCM Tolerance Value":
                         fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
