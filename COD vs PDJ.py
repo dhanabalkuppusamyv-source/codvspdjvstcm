@@ -118,13 +118,36 @@ def extract_all_images_from_cod(cod_file_path):
     for i, img in enumerate(ws._images):
         img_path = f"/tmp/ref_image_{i}.png"
 
-        # write raw image bytes
+        # 🔥 Correct way: write raw image bytes
         with open(img_path, "wb") as f:
             f.write(img._data())
 
         images.append(img_path)
 
     return images
+
+
+def first_numeric_in_row(df, r):
+    nums = row_numbers(df, r)
+    return nums[0] if nums else None
+
+def extract_tcm_nominal_from_row(nums, tol_mag, eps):
+    """
+    Return TCM nominal from key row:
+    - Ignore ± tolerance pairs
+    - Ignore values equal to COD tolerance magnitude
+    - Return remaining standalone positive number
+    """
+    for x in nums:
+        if (
+            x > 0 and
+            -x not in nums and
+            not approx_equal(x, tol_mag, eps)
+        ):
+            return x
+    return None
+
+
 
 
 
@@ -319,10 +342,6 @@ def fmt_pm(m):
     s = f"{abs(m):.2f}".rstrip("0").rstrip(".")
     return f"+/- {s}"
 
-def fmt_num(v):
-    s = f"{v:.2f}".rstrip("0").rstrip(".")
-    return s
-
 # ==============================
 # App UI
 # ==============================
@@ -440,69 +459,31 @@ if cod_file and other_files:
 
             for (r, _) in pos:
 
-                if is_pdj or is_tcm:
-                    nums = row_numbers(df, r)
+                if is_pdj:
+                    validation_nums = row_numbers(df, r)
+                    tcm_row_nums = []
+
+                # ---------- TCM ----------
+                elif is_tcm:
+                    validation_nums = sheet_numbers(df)   # FULL sheet for validation
+                    tcm_row_nums = row_numbers(df, r)      # Row only for display
                 else:
                     row_nums = row_numbers(df, r)
                     if (
                         contains_value_eps(row_nums, cod_nominal, eps) or
                         contains_pm_pair_eps(row_nums, tol_mag, eps)
                     ):
-                        nums = row_nums
+                        validation_nums = row_nums
                     else:
-                        nums = sheet_numbers(df)
+                        validation_nums = sheet_numbers(df)
+                    tcm_row_nums = []
 
-                nominal_ok = contains_value_eps(nums, cod_nominal, eps)
-                tol_ok = contains_pm_pair_eps(nums, tol_mag, eps)
-                actual_nominal_found = extract_actual_nominal(nums, cod_nominal, eps)
-                actual_tolerance_found = extract_actual_tolerance(nums)
+                nominal_ok = contains_value_eps(validation_nums, cod_nominal, eps)
+                tol_ok = contains_pm_pair_eps(validation_nums, tol_mag, eps)
 
-                # --- Improved: exclude numbers that come from ± patterns (tolerances) ---
-                # Collect pm magnitudes separately, collect other numeric tokens in appearance order.
-                row = df.iloc[r, :].tolist()
-                pm_mags = []          # numbers that were found as ± (explicit tolerance tokens)
-                ordered_nums = []     # all numeric tokens in appearance order
+                actual_nominal_found = extract_actual_nominal(validation_nums, cod_nominal, eps)
+                actual_tolerance_found = extract_actual_tolerance(validation_nums)
 
-                for cell in row:
-                    s = "" if pd.isna(cell) else str(cell)
-                    # capture explicit ± patterns first (store magnitude but DO NOT treat them as nominals)
-                    for m in RE_PM.findall(s):
-                        x = to_float(m)
-                        if x is not None:
-                            pm_mags.append(abs(x))
-                    # then capture other numeric occurrences in the text in order
-                    for m in RE_NUM.finditer(s):
-                        x = to_float(m.group(0))
-                        if x is not None:
-                            ordered_nums.append(abs(x))
-
-                # Deduplicate near-equal numbers while keeping first-seen order (use eps)
-                tcm_all_values = []
-                for x in ordered_nums:
-                    if x is None:
-                        continue
-                    if not any(approx_equal(x, v, eps) for v in tcm_all_values):
-                        tcm_all_values.append(x)
-
-                def is_fractional(val, eps_local):
-                    # True if value is not approximately an integer (uses eps)
-                    return not approx_equal(val, round(val), eps_local)
-
-                # Keep values that are either:
-                #  - fractional (e.g. 1.2, 6.5, 2.5), OR
-                #  - match the COD nominal (so COD-matching nominals are included even if integer),
-                # BUT always exclude any value that matches a pm magnitude extracted from ± patterns.
-                tcm_nominal_values = []
-                for x in tcm_all_values:
-                    # skip if this value is the same as any extracted ± magnitude (these are tolerances)
-                    if any(approx_equal(x, pm, eps) for pm in pm_mags):
-                        continue
-                    if is_fractional(x, eps) or approx_equal(x, cod_nominal, eps):
-                        if not any(approx_equal(x, v, eps) for v in tcm_nominal_values):
-                            tcm_nominal_values.append(x)
-
-                # Format for display
-                tcm_nominal_str = ", ".join(fmt_num(v) for v in tcm_nominal_values) if tcm_nominal_values else ""
 
                 matched=[]
                 if nominal_ok:
@@ -513,8 +494,12 @@ if cod_file and other_files:
                 pdj_tolerance_val = ""
 
                 if is_pdj:
-                    pdj_nominal_val = extract_pdj_nominal(nums, cod_nominal, eps)
-                    pdj_tolerance_val = extract_pdj_tolerance(nums)
+                    pdj_nominal_val = extract_pdj_nominal(validation_nums, cod_nominal, eps)
+                    pdj_tolerance_val = extract_pdj_tolerance(validation_nums)
+                tcm_nominal = None
+                if is_tcm:
+                    tcm_nominal = extract_tcm_nominal_from_row(tcm_row_nums, tol_mag, eps)
+
 
 
                 results.append({
@@ -527,11 +512,12 @@ if cod_file and other_files:
                     "PDJ Nominal Value": pdj_nominal_val,
                     "PDJ Tolerance Value": pdj_tolerance_val,
                     "TCM Nominal Value":
-                        # show fractional numbers + any value equal to COD nominal (appearance order)
-                        # but exclude numbers that were captured as ± (tolerances)
-                        tcm_nominal_str,
+                        tcm_nominal if tcm_nominal is not None else ref_nom_disp,
                     "TCM Tolerance Value":
-                        fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
+                        fmt_pm(extract_actual_tolerance(tcm_row_nums))
+                        if is_tcm and extract_actual_tolerance(tcm_row_nums) is not None
+                        else "",
+
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
                     "Actual Tolerance Found ?": "Yes" if tol_ok else "No",
                     "OK - Nominal and Tolerance value": ", ".join(matched),
