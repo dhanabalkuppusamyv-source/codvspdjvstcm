@@ -131,6 +131,18 @@ def first_numeric_in_row(df, r):
     nums = row_numbers(df, r)
     return nums[0] if nums else None
 
+def extract_tcm_nominal_from_row(nums):
+    """
+    Return the nominal value from a TCM row:
+    - Ignore ± pairs
+    - Return the first standalone positive number
+    """
+    for x in nums:
+        if x > 0 and -x not in nums:
+            return x
+    return ""
+
+
 
 
 # ==============================
@@ -490,7 +502,7 @@ if cod_file and other_files:
                     "PDJ Nominal Value": pdj_nominal_val,
                     "PDJ Tolerance Value": pdj_tolerance_val,
                     "TCM Nominal Value":
-                        tcm_row_nums[0] if is_tcm and tcm_row_nums else "",
+                        extract_tcm_nominal_from_row(tcm_row_nums) if is_tcm else "",
                     "TCM Tolerance Value":
                         fmt_pm(extract_actual_tolerance(tcm_row_nums))
                         if is_tcm and extract_actual_tolerance(tcm_row_nums) is not None
