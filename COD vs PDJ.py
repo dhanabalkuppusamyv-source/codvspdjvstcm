@@ -70,10 +70,10 @@ def header_with_tip(text: str, tip: str):
         unsafe_allow_html=True
     )
 
-def extract_actual_nominal(nums, cod_nominal, eps):
+def extract_actual_nominal(nums):
+    """Return first numeric value found in row (nominal)."""
     for x in nums:
-        if approx_equal(x, cod_nominal, eps):
-            return x
+        return x
     return None
 
 
@@ -90,21 +90,6 @@ def extract_actual_tolerance(nums):
         if x > 0:
             return abs(x)
     return None
-
-def extract_pdj_nominal(nums, cod_nominal, eps):
-    """Return PDJ nominal value matching COD nominal"""
-    for x in nums:
-        if approx_equal(x, cod_nominal, eps):
-            return x
-    return ""
-
-def extract_pdj_tolerance(nums):
-    """Return PDJ tolerance (± value) if present"""
-    for x in nums:
-        if -x in nums:
-            return fmt_pm(abs(x))
-    return ""
-
 
 def extract_all_images_from_cod(cod_file_path):
     wb = load_workbook(cod_file_path)
@@ -125,27 +110,6 @@ def extract_all_images_from_cod(cod_file_path):
         images.append(img_path)
 
     return images
-
-
-def first_numeric_in_row(df, r):
-    nums = row_numbers(df, r)
-    return nums[0] if nums else None
-
-def extract_tcm_nominal_from_row(nums, tol_mag, eps):
-    """
-    Return TCM nominal from key row:
-    - Ignore ± tolerance pairs
-    - Ignore values equal to COD tolerance magnitude
-    - Return remaining standalone positive number
-    """
-    for x in nums:
-        if (
-            x > 0 and
-            -x not in nums and
-            not approx_equal(x, tol_mag, eps)
-        ):
-            return x
-    return None
 
 
 
@@ -459,48 +423,28 @@ if cod_file and other_files:
 
             for (r, _) in pos:
 
-                if is_pdj:
-                    validation_nums = row_numbers(df, r)
-                    tcm_row_nums = []
-
-                # ---------- TCM ----------
-                elif is_tcm:
-                    validation_nums = sheet_numbers(df)   # FULL sheet for validation
-                    tcm_row_nums = row_numbers(df, r)      # Row only for display
+                if is_pdj or is_tcm:
+                    nums = row_numbers(df, r)
                 else:
                     row_nums = row_numbers(df, r)
                     if (
                         contains_value_eps(row_nums, cod_nominal, eps) or
                         contains_pm_pair_eps(row_nums, tol_mag, eps)
                     ):
-                        validation_nums = row_nums
+                        nums = row_nums
                     else:
-                        validation_nums = sheet_numbers(df)
-                    tcm_row_nums = []
+                        nums = sheet_numbers(df)
 
-                nominal_ok = contains_value_eps(validation_nums, cod_nominal, eps)
-                tol_ok = contains_pm_pair_eps(validation_nums, tol_mag, eps)
-
-                actual_nominal_found = extract_actual_nominal(validation_nums, cod_nominal, eps)
-                actual_tolerance_found = extract_actual_tolerance(validation_nums)
-
+                nominal_ok = contains_value_eps(nums, cod_nominal, eps)
+                tol_ok = contains_pm_pair_eps(nums, tol_mag, eps)
+                actual_nominal_found = extract_actual_nominal(nums)
+                actual_tolerance_found = extract_actual_tolerance(nums)
 
                 matched=[]
                 if nominal_ok:
                     matched.append(f"{ref_nom_disp}")
                 if tol_ok:
                     matched.append(fmt_pm(ref_tol_disp))
-                pdj_nominal_val = ""
-                pdj_tolerance_val = ""
-
-                if is_pdj:
-                    pdj_nominal_val = extract_pdj_nominal(validation_nums, cod_nominal, eps)
-                    pdj_tolerance_val = extract_pdj_tolerance(validation_nums)
-                tcm_nominal = None
-                if is_tcm:
-                    tcm_nominal = extract_tcm_nominal_from_row(tcm_row_nums, tol_mag, eps)
-
-
 
                 results.append({
                     "Compared Key": key_value,
@@ -509,15 +453,10 @@ if cod_file and other_files:
                     "Key Row": r+1,
                     "COD Nominal": ref_nom_disp,
                     "COD Tolerance": fmt_pm(ref_tol_disp),
-                    "PDJ Nominal Value": pdj_nominal_val,
-                    "PDJ Tolerance Value": pdj_tolerance_val,
                     "TCM Nominal Value":
-                        tcm_nominal if tcm_nominal is not None else ref_nom_disp,
+                        actual_nominal_found if actual_nominal_found is not None else "",
                     "TCM Tolerance Value":
-                        fmt_pm(extract_actual_tolerance(tcm_row_nums))
-                        if is_tcm and extract_actual_tolerance(tcm_row_nums) is not None
-                        else "",
-
+                        fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
                     "Actual Tolerance Found ?": "Yes" if tol_ok else "No",
                     "OK - Nominal and Tolerance value": ", ".join(matched),
