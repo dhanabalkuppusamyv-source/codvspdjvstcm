@@ -460,8 +460,9 @@ if cod_file and other_files:
                 # --- Updated logic:
                 # collect numeric tokens from the key row in appearance order,
                 # dedupe near-equals, then keep:
-                #   - any fractional numbers (e.g. 1.2, 6.5, 2.5, 0.5)
+                #   - any fractional numbers (e.g. 1.2, 6.5, 2.5)
                 #   - OR any number that matches the COD nominal (within eps)
+                # BUT exclude any token that equals the detected tolerance magnitude for that row.
                 row = df.iloc[r, :].tolist()
                 ordered_nums = []
                 for cell in row:
@@ -489,9 +490,12 @@ if cod_file and other_files:
                     # True if value is not approximately an integer (uses eps)
                     return not approx_equal(val, round(val), eps_local)
 
-                # keep fractional values OR COD-matching values
+                # keep fractional values OR COD-matching values, but exclude tolerance magnitude
                 tcm_nominal_values = []
                 for x in tcm_all_values:
+                    # skip tokens that match the detected tolerance for this row
+                    if actual_tolerance_found is not None and approx_equal(x, actual_tolerance_found, eps):
+                        continue
                     if is_fractional(x, eps) or approx_equal(x, cod_nominal, eps):
                         if not any(approx_equal(x, v, eps) for v in tcm_nominal_values):
                             tcm_nominal_values.append(x)
@@ -501,8 +505,6 @@ if cod_file and other_files:
 
                 matched=[]
                 if nominal_ok:
-                    # show actual matched values from the row in OK column (use actual_nominal_found if you prefer)
-                    # here we keep the COD reference as before:
                     matched.append(f"{ref_nom_disp}")
                 if tol_ok:
                     matched.append(fmt_pm(ref_tol_disp))
@@ -524,7 +526,8 @@ if cod_file and other_files:
                     "PDJ Nominal Value": pdj_nominal_val,
                     "PDJ Tolerance Value": pdj_tolerance_val,
                     "TCM Nominal Value":
-                        # show fractional numbers + any value equal to COD nominal (appearance order)
+                        # show fractional numbers + any value equal to COD nominal (appearance order),
+                        # but exclude the detected tolerance magnitude
                         tcm_nominal_str,
                     "TCM Tolerance Value":
                         fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
