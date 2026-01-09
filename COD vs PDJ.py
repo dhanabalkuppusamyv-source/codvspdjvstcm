@@ -127,6 +127,9 @@ def extract_all_images_from_cod(cod_file_path):
     return images
 
 
+def first_numeric_in_row(df, r):
+    nums = row_numbers(df, r)
+    return nums[0] if nums else None
 
 
 
@@ -438,8 +441,14 @@ if cod_file and other_files:
 
             for (r, _) in pos:
 
-                if is_pdj or is_tcm:
+                if is_pdj:
                     nums = row_numbers(df, r)
+                elif is_tcm:
+                    # FULL sheet scan for validation
+                    nums = sheet_numbers(df)
+
+                    # Correct TCM nominal (from key row itself)
+                    tcm_nominal_row_value = first_numeric_in_row(df, r)
                 else:
                     row_nums = row_numbers(df, r)
                     if (
@@ -477,11 +486,8 @@ if cod_file and other_files:
                     "COD Tolerance": fmt_pm(ref_tol_disp),
                     "PDJ Nominal Value": pdj_nominal_val,
                     "PDJ Tolerance Value": pdj_tolerance_val,
-
                     "TCM Nominal Value":
-                        actual_nominal_found
-                        if actual_nominal_found is not None
-                        else (nums[0] if nums else ""),
+                        tcm_nominal_row_value if is_tcm else actual_nominal_found,
                     "TCM Tolerance Value":
                         fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
