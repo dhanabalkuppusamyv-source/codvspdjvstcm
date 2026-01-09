@@ -442,14 +442,12 @@ if cod_file and other_files:
             for (r, _) in pos:
 
                 if is_pdj:
-                    pdj_nominal_val = extract_pdj_nominal(validation_nums, cod_nominal, eps)
-                    pdj_tolerance_val = extract_pdj_tolerance(validation_nums)
-                
-                elif is_tcm:
-                    # FULL sheet scan for validation
-                    validation_nums = sheet_numbers(df)
+                    validation_nums = row_numbers(df, r)
+                    tcm_row_nums = []
 
-                    # Correct TCM nominal (from key row itself)
+                # ---------- TCM ----------
+                elif is_tcm:
+                    validation_nums = sheet_numbers(df)
                     tcm_row_nums = row_numbers(df, r)
                 else:
                     row_nums = row_numbers(df, r)
@@ -478,8 +476,8 @@ if cod_file and other_files:
                 pdj_tolerance_val = ""
 
                 if is_pdj:
-                    pdj_nominal_val = extract_pdj_nominal(nums, cod_nominal, eps)
-                    pdj_tolerance_val = extract_pdj_tolerance(nums)
+                    pdj_nominal_val = extract_pdj_nominal(validation_nums, cod_nominal, eps)
+                    pdj_tolerance_val = extract_pdj_tolerance(validation_nums)
 
 
                 results.append({
