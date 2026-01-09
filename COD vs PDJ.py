@@ -457,17 +457,19 @@ if cod_file and other_files:
                 actual_nominal_found = extract_actual_nominal(nums, cod_nominal, eps)
                 actual_tolerance_found = extract_actual_tolerance(nums)
 
-                # --- Updated: collect numeric tokens from the key row in appearance order,
-                # dedupe near-equals, then keep nominal-like numbers BUT exclude detected tolerance magnitudes.
+                # --- Improved: exclude numbers that come from ± patterns (tolerances) ---
+                # Collect pm magnitudes separately, collect other numeric tokens in appearance order.
                 row = df.iloc[r, :].tolist()
-                ordered_nums = []
+                pm_mags = []          # numbers that were found as ± (explicit tolerance tokens)
+                ordered_nums = []     # all numeric tokens in appearance order
+
                 for cell in row:
                     s = "" if pd.isna(cell) else str(cell)
-                    # capture explicit ± patterns first (gives magnitude)
+                    # capture explicit ± patterns first (store magnitude but DO NOT treat them as nominals)
                     for m in RE_PM.findall(s):
                         x = to_float(m)
                         if x is not None:
-                            ordered_nums.append(abs(x))
+                            pm_mags.append(abs(x))
                     # then capture other numeric occurrences in the text in order
                     for m in RE_NUM.finditer(s):
                         x = to_float(m.group(0))
@@ -488,12 +490,12 @@ if cod_file and other_files:
 
                 # Keep values that are either:
                 #  - fractional (e.g. 1.2, 6.5, 2.5), OR
-                #  - match the COD nominal (so COD matching nominals are included even if integer),
-                # BUT always exclude values that equal the detected tolerance magnitude for that row.
+                #  - match the COD nominal (so COD-matching nominals are included even if integer),
+                # BUT always exclude any value that matches a pm magnitude extracted from ± patterns.
                 tcm_nominal_values = []
                 for x in tcm_all_values:
-                    if actual_tolerance_found is not None and approx_equal(x, actual_tolerance_found, eps):
-                        # skip tolerance magnitudes (e.g. 1.4, 1.3, 0.5, ...)
+                    # skip if this value is the same as any extracted ± magnitude (these are tolerances)
+                    if any(approx_equal(x, pm, eps) for pm in pm_mags):
                         continue
                     if is_fractional(x, eps) or approx_equal(x, cod_nominal, eps):
                         if not any(approx_equal(x, v, eps) for v in tcm_nominal_values):
@@ -526,7 +528,7 @@ if cod_file and other_files:
                     "PDJ Tolerance Value": pdj_tolerance_val,
                     "TCM Nominal Value":
                         # show fractional numbers + any value equal to COD nominal (appearance order)
-                        # but exclude any detected tolerance magnitudes (so 1.3/1.4/0.5 etc are removed)
+                        # but exclude numbers that were captured as ± (tolerances)
                         tcm_nominal_str,
                     "TCM Tolerance Value":
                         fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
