@@ -145,7 +145,7 @@ def extract_tcm_nominal_from_row(nums, tol_mag, eps):
             not approx_equal(x, tol_mag, eps)
         ):
             return x
-    return ""
+    return None
 
 
 
@@ -508,7 +508,9 @@ if cod_file and other_files:
                     "PDJ Nominal Value": pdj_nominal_val,
                     "PDJ Tolerance Value": pdj_tolerance_val,
                     "TCM Nominal Value":
-                        extract_tcm_nominal_from_row(tcm_row_nums, tol_mag, eps),
+                        extract_tcm_nominal_from_row(tcm_row_nums, tol_mag, eps)
+                        if extract_tcm_nominal_from_row(tcm_row_nums, tol_mag, eps) is not None
+                        else ref_nom_disp,
                     "TCM Tolerance Value":
                         fmt_pm(extract_actual_tolerance(tcm_row_nums))
                         if is_tcm and extract_actual_tolerance(tcm_row_nums) is not None
