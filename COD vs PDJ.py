@@ -7,7 +7,7 @@ from openpyxl.styles import PatternFill
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils import get_column_letter
-from openpyxl.styles import Border, Side
+
 
 
 # ==============================
@@ -453,13 +453,15 @@ if cod_file and other_files:
                     "Key Row": r+1,
                     "COD Nominal": ref_nom_disp,
                     "COD Tolerance": fmt_pm(ref_tol_disp),
-                    "TCM Nominal Value":
-                        actual_nominal_found if actual_nominal_found is not None else "",
-                    "TCM Tolerance Value":
-                        fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
                     "Actual Tolerance Found ?": "Yes" if tol_ok else "No",
                     "OK - Nominal and Tolerance value": ", ".join(matched),
+                    "TCM Nominal Value":
+                        actual_nominal_found if actual_nominal_found is not None else "",
+
+                    "TCM Tolerance Value":
+                        fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
+
                     "Not-OK Value":
                         fmt_pm(actual_tolerance_found)
                         if actual_tolerance_found is not None and not tol_ok else "",
@@ -490,19 +492,11 @@ if cod_file and other_files:
         st.dataframe(styled_df, use_container_width=True)
 
         def create_colored_excel(df):
-            
             wb = Workbook()
             ws = wb.active
             ws.title = "Results"
-            # Border
-            thin = Side(style="thin")
-            border = Border(left=thin, right=thin, top=thin, bottom=thin)
-            # Header
+
             ws.append(df.columns.tolist())
-
-            for c in range(1, len(df.columns) + 1):
-                ws.cell(row=1, column=c).border = border
-
 
             ref_col_idx = df.columns.get_loc("Ref image") + 1
             first_data_row = 2
@@ -521,9 +515,6 @@ if cod_file and other_files:
             for row_idx, row_data in df.iterrows():
                 ws.append([row_data[col] for col in df.columns])
                 excel_r = ws.max_row
-
-                for c in range(1, len(df.columns) + 1):
-                    ws.cell(row=excel_r, column=c).border = border
 
                 ws.cell(
                     excel_r,
