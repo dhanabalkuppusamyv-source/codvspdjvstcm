@@ -205,7 +205,7 @@ def find_stacked_anchor_vertical(df, words, max_gap=10):
 def first_number_below(df, start_row, col, right_span=12, down_rows=4):
     R, C = df.shape
     for rr in range(start_row+1, min(R, start_row+1+down_rows)):
-        for cc in range(col, min(C, col+right_span)):
+        for cc in range(col, min(C, cc+right_span) if 'cc' in locals() else min(C, col+right_span)):
             s = "" if pd.isna(df.iat[rr,cc]) else str(df.iat[rr,cc])
 
             m = RE_PM.search(s)
@@ -457,25 +457,29 @@ if cod_file and other_files:
                 actual_nominal_found = extract_actual_nominal(nums, cod_nominal, eps)
                 actual_tolerance_found = extract_actual_tolerance(nums)
 
-                # --- NEW: collect all TCM nominal candidates from the row (exclude tolerance mag) ---
-                # Build a list of positive numeric candidates (abs for ± pairs),
-                # exclude numbers that match the detected tolerance magnitude,
-                # deduplicate using epsilon.
+                # --- NEW: collect all numeric tokens from the specific key row in appearance order ---
+                row = df.iloc[r, :].tolist()
+                ordered_nums = []
+                for cell in row:
+                    s = "" if pd.isna(cell) else str(cell)
+                    # capture explicit ± patterns first (gives magnitude)
+                    for m in RE_PM.findall(s):
+                        x = to_float(m)
+                        if x is not None:
+                            ordered_nums.append(abs(x))
+                    # then capture other numeric occurrences in the text in order
+                    for m in RE_NUM.finditer(s):
+                        x = to_float(m.group(0))
+                        if x is not None:
+                            ordered_nums.append(abs(x))
+
+                # Deduplicate near-equal numbers while keeping first-seen order (use eps)
                 tcm_nominal_values = []
-                if nums:
-                    for x in nums:
-                        if x is None:
-                            continue
-                        # consider positive magnitude candidates only (nominals typically positive)
-                        mag = abs(x)
-                        # skip if this number is the tolerance magnitude
-                        if actual_tolerance_found is not None and approx_equal(mag, abs(actual_tolerance_found), eps):
-                            continue
-                        # keep positive numbers (avoid listing negative sign duplicates)
-                        if mag >= 0:
-                            # dedupe with approx_equal
-                            if not any(approx_equal(mag, v, eps) for v in tcm_nominal_values):
-                                tcm_nominal_values.append(mag)
+                for x in ordered_nums:
+                    if x is None:
+                        continue
+                    if not any(approx_equal(x, v, eps) for v in tcm_nominal_values):
+                        tcm_nominal_values.append(x)
 
                 # Format for display
                 if tcm_nominal_values:
@@ -506,7 +510,7 @@ if cod_file and other_files:
                     "PDJ Nominal Value": pdj_nominal_val,
                     "PDJ Tolerance Value": pdj_tolerance_val,
                     "TCM Nominal Value":
-                        # previously only showed matching nominal; now show all numeric candidates on the row
+                        # show all numeric tokens found on the row (in appearance order, deduped by eps)
                         tcm_nominal_str,
                     "TCM Tolerance Value":
                         fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
