@@ -496,6 +496,10 @@ if cod_file and other_files:
                 if is_pdj:
                     pdj_nominal_val = extract_pdj_nominal(validation_nums, cod_nominal, eps)
                     pdj_tolerance_val = extract_pdj_tolerance(validation_nums)
+                tcm_nominal = None
+                if is_tcm:
+                    tcm_nominal = extract_tcm_nominal_from_row(tcm_row_nums, tol_mag, eps)
+
 
 
                 results.append({
@@ -508,9 +512,7 @@ if cod_file and other_files:
                     "PDJ Nominal Value": pdj_nominal_val,
                     "PDJ Tolerance Value": pdj_tolerance_val,
                     "TCM Nominal Value":
-                        extract_tcm_nominal_from_row(tcm_row_nums, tol_mag, eps)
-                        if extract_tcm_nominal_from_row(tcm_row_nums, tol_mag, eps) is not None
-                        else ref_nom_disp,
+                        tcm_nominal if tcm_nominal is not None else ref_nom_disp,
                     "TCM Tolerance Value":
                         fmt_pm(extract_actual_tolerance(tcm_row_nums))
                         if is_tcm and extract_actual_tolerance(tcm_row_nums) is not None
