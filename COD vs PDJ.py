@@ -372,7 +372,6 @@ if cod_file and other_files:
 
     ref_image_paths = extract_all_images_from_cod(cod_temp_path)
 
-    
     cod_sheets = read_all_sheets(cod_file.name, cod_bytes)
 
     s_cod, key_value, _, _ = find_codification_value_below(cod_sheets,"codification")
@@ -457,8 +456,8 @@ if cod_file and other_files:
                 actual_nominal_found = extract_actual_nominal(nums, cod_nominal, eps)
                 actual_tolerance_found = extract_actual_tolerance(nums)
 
-                # --- UPDATED: Only include numbers from the row that match COD nominal (within eps) ---
-                # Collect numeric tokens from the specific key row in appearance order
+                # --- NEW: collect all numeric tokens from the specific key row in appearance order ---
+                # and also collect the subset that matches COD nominal (within eps).
                 row = df.iloc[r, :].tolist()
                 ordered_nums = []
                 for cell in row:
@@ -472,24 +471,26 @@ if cod_file and other_files:
                     for m in RE_NUM.finditer(s):
                         x = to_float(m.group(0))
                         if x is not None:
-                            ordered_nums.append(x)
+                            ordered_nums.append(abs(x))
 
-                # Keep only values that approximately equal the COD nominal (using eps),
-                # dedupe near-equal matches while preserving first occurrence order.
-                tcm_nominal_values = []
+                # Deduplicate near-equal numbers while keeping first-seen order (use eps)
+                tcm_all_values = []
                 for x in ordered_nums:
                     if x is None:
                         continue
-                    if approx_equal(abs(x), cod_nominal, eps):
-                        mag = abs(x)
-                        if not any(approx_equal(mag, v, eps) for v in tcm_nominal_values):
-                            tcm_nominal_values.append(mag)
+                    if not any(approx_equal(x, v, eps) for v in tcm_all_values):
+                        tcm_all_values.append(x)
 
-                # Format for display (single value like "1.2" if found, else empty)
-                if tcm_nominal_values:
-                    tcm_nominal_str = ", ".join(fmt_num(v) for v in tcm_nominal_values)
-                else:
-                    tcm_nominal_str = ""
+                # Matched nominal values (approx equal to COD nominal)
+                tcm_matched_values = []
+                for x in tcm_all_values:
+                    if approx_equal(x, cod_nominal, eps):
+                        if not any(approx_equal(x, v, eps) for v in tcm_matched_values):
+                            tcm_matched_values.append(x)
+
+                # Format for display
+                tcm_all_str = ", ".join(fmt_num(v) for v in tcm_all_values) if tcm_all_values else ""
+                tcm_matched_str = ", ".join(fmt_num(v) for v in tcm_matched_values) if tcm_matched_values else ""
 
                 matched=[]
                 if nominal_ok:
@@ -514,8 +515,11 @@ if cod_file and other_files:
                     "PDJ Nominal Value": pdj_nominal_val,
                     "PDJ Tolerance Value": pdj_tolerance_val,
                     "TCM Nominal Value":
-                        # show only nominal(s) that match COD nominal (deduped)
-                        tcm_nominal_str,
+                        # ALL numeric tokens from the TCM row (appearance order, deduped)
+                        tcm_all_str,
+                    "TCM Matched Nominal Value":
+                        # Only the nominal(s) that match the COD nominal within eps (deduped)
+                        tcm_matched_str,
                     "TCM Tolerance Value":
                         fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
