@@ -442,8 +442,9 @@ if cod_file and other_files:
             for (r, _) in pos:
 
                 if is_pdj:
-                    validation_nums = row_numbers(df, r)
-                    tcm_row_nums = []
+                    pdj_nominal_val = extract_pdj_nominal(validation_nums, cod_nominal, eps)
+                    pdj_tolerance_val = extract_pdj_tolerance(validation_nums)
+                
                 elif is_tcm:
                     # FULL sheet scan for validation
                     validation_nums = sheet_numbers(df)
