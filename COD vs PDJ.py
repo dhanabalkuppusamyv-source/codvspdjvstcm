@@ -447,8 +447,8 @@ if cod_file and other_files:
 
                 # ---------- TCM ----------
                 elif is_tcm:
-                    validation_nums = sheet_numbers(df)
-                    tcm_row_nums = row_numbers(df, r)
+                    validation_nums = row_numbers(df, r)
+                    tcm_row_nums = validation_nums
                 else:
                     row_nums = row_numbers(df, r)
                     if (
