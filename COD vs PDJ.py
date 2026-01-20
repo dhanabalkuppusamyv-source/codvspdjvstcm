@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -8,7 +9,6 @@ from openpyxl import load_workbook
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Border, Side
-
 
 # ==============================
 # Style & helpers (UI)
@@ -76,7 +76,6 @@ def extract_actual_nominal(nums, cod_nominal, eps):
             return x
     return None
 
-
 def extract_actual_tolerance(nums):
     """
     Return tolerance if present:
@@ -105,28 +104,25 @@ def extract_pdj_tolerance(nums):
             return fmt_pm(abs(x))
     return ""
 
-
 def extract_all_images_from_cod(cod_file_path):
     wb = load_workbook(cod_file_path)
     ws = wb.active
 
     images = []
 
+    # openpyxl stores images in ws._images (private), if present
     if not hasattr(ws, "_images"):
         return images
 
     for i, img in enumerate(ws._images):
         img_path = f"/tmp/ref_image_{i}.png"
-
         # write raw image bytes
+        # Note: This uses a private method; works for many openpyxl builds
         with open(img_path, "wb") as f:
             f.write(img._data())
-
         images.append(img_path)
 
     return images
-
-
 
 # ==============================
 # Regex & utilities
@@ -372,7 +368,6 @@ if cod_file and other_files:
 
     ref_image_paths = extract_all_images_from_cod(cod_temp_path)
 
-    
     cod_sheets = read_all_sheets(cod_file.name, cod_bytes)
 
     s_cod, key_value, _, _ = find_codification_value_below(cod_sheets,"codification")
@@ -457,8 +452,7 @@ if cod_file and other_files:
                 actual_nominal_found = extract_actual_nominal(nums, cod_nominal, eps)
                 actual_tolerance_found = extract_actual_tolerance(nums)
 
-                # --- Updated logic:
-                # collect numeric tokens from the key row in appearance order,
+                # Collect numeric tokens from the key row in appearance order,
                 # dedupe near-equals, then keep:
                 #   - any fractional numbers (e.g. 1.2, 6.5, 2.5)
                 #   - OR any number that matches the COD nominal (within eps)
@@ -515,7 +509,6 @@ if cod_file and other_files:
                     pdj_nominal_val = extract_pdj_nominal(nums, cod_nominal, eps)
                     pdj_tolerance_val = extract_pdj_tolerance(nums)
 
-
                 results.append({
                     "Compared Key": key_value,
                     "File": tag,
@@ -525,18 +518,12 @@ if cod_file and other_files:
                     "COD Tolerance": fmt_pm(ref_tol_disp),
                     "PDJ Nominal Value": pdj_nominal_val,
                     "PDJ Tolerance Value": pdj_tolerance_val,
-                    "TCM Nominal Value":
-                        # show fractional numbers + any value equal to COD nominal (appearance order),
-                        # but exclude the detected tolerance magnitude
-                        tcm_nominal_str,
-                    "TCM Tolerance Value":
-                        fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
+                    "TCM Nominal Value": tcm_nominal_str,
+                    "TCM Tolerance Value": fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
                     "Actual Tolerance Found ?": "Yes" if tol_ok else "No",
                     "OK - Nominal and Tolerance value": ", ".join(matched),
-                    "Not-OK Value":
-                        fmt_pm(actual_tolerance_found)
-                        if actual_tolerance_found is not None and not tol_ok else "",
+                    "Not-OK Value": fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None and not tol_ok else "",
                 })
 
     # ============================
@@ -548,7 +535,38 @@ if cod_file and other_files:
         df_out["Ref image"] = ""
         # Add SI.No as first column
         df_out.insert(0, "SI.No", range(1, len(df_out) + 1))
-        
+
+        # --- IMPORTANT: Ensure PDJ columns (H & I) exist and remain ---
+        # Create empty columns if missing (safety)
+        for col in ["PDJ Nominal Value", "PDJ Tolerance Value"]:
+            if col not in df_out.columns:
+                df_out[col] = ""
+
+        # Reorder columns so that:
+        #   H = PDJ Nominal Value
+        #   I = PDJ Tolerance Value
+        desired_order = [
+            "SI.No",                    # A
+            "Compared Key",             # B
+            "File",                     # C
+            "Sheet",                    # D
+            "Key Row",                  # E
+            "COD Nominal",              # F
+            "COD Tolerance",            # G
+            "PDJ Nominal Value",        # H
+            "PDJ Tolerance Value",      # I
+            "TCM Nominal Value",        # J
+            "TCM Tolerance Value",      # K
+            "Actual Nominal Found ?",   # L
+            "Actual Tolerance Found ?", # M
+            "OK - Nominal and Tolerance value", # N
+            "Not-OK Value",             # O
+            "Ref image"                 # P
+        ]
+        existing = [c for c in desired_order if c in df_out.columns]
+        df_out = df_out[existing]
+
+        # Coloring in Streamlit UI for Yes/No columns
         def color_yes_no(val):
             if val == "Yes":
                 return "background-color:#C6F7C6; color:black;"
@@ -564,64 +582,66 @@ if cod_file and other_files:
         st.dataframe(styled_df, use_container_width=True)
 
         def create_colored_excel(df):
-            
             wb = Workbook()
             ws = wb.active
             ws.title = "Results"
+
             # Border
             thin = Side(style="thin")
             border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
             # Header
             ws.append(df.columns.tolist())
-
             for c in range(1, len(df.columns) + 1):
                 ws.cell(row=1, column=c).border = border
 
+            # Fills
+            green = PatternFill(start_color="C6F7C6", end_color="C6F7C6", fill_type="solid")
+            red = PatternFill(start_color="FFB3B3", end_color="FFB3B3", fill_type="solid")
 
-            ref_col_idx = df.columns.get_loc("Ref image") + 1
-            first_data_row = 2
-
-            green = PatternFill(
-                start_color="C6F7C6",
-                end_color="C6F7C6",
-                fill_type="solid"
-            )
-            red = PatternFill(
-                start_color="FFB3B3",
-                end_color="FFB3B3",
-                fill_type="solid"
-            )
-
-            for row_idx, row_data in df.iterrows():
-                ws.append([row_data[col] for col in df.columns])
+            # Data rows
+            for _, row_data in df.iterrows():
+                ws.append([row_data.get(col, "") for col in df.columns])
                 excel_r = ws.max_row
-
                 for c in range(1, len(df.columns) + 1):
                     ws.cell(row=excel_r, column=c).border = border
 
-                ws.cell(
-                    excel_r,
-                    df.columns.get_loc("Actual Nominal Found ?")+1
-                ).fill = green if row_data["Actual Nominal Found ?"] == "Yes" else red
+            # Apply green/red fills after writing all rows
+            if "Actual Nominal Found ?" in df.columns and "Actual Tolerance Found ?" in df.columns:
+                an_col = df.columns.get_loc("Actual Nominal Found ?") + 1
+                at_col = df.columns.get_loc("Actual Tolerance Found ?") + 1
+                for r in range(2, ws.max_row + 1):
+                    ws.cell(r, an_col).fill = green if ws.cell(r, an_col).value == "Yes" else red
+                    ws.cell(r, at_col).fill = green if ws.cell(r, at_col).value == "Yes" else red
 
-                ws.cell(
-                    excel_r,
-                    df.columns.get_loc("Actual Tolerance Found ?")+1
-                ).fill = green if row_data["Actual Tolerance Found ?"] == "Yes" else red
+            # Place reference images without altering columns
+            if "Ref image" in df.columns:
+                ref_col_idx = df.columns.get_loc("Ref image") + 1
+                first_data_row = 2
+                if ref_image_paths:
+                    col_letter = ws.cell(1, ref_col_idx).column_letter
+                    start_row = first_data_row
+                    for img_path in ref_image_paths:
+                        img = XLImage(img_path)
+                        img.width = 140
+                        img.height = 90
+                        ws.add_image(img, f"{col_letter}{start_row}")
+                        ws.row_dimensions[start_row].height = 80
+                        start_row += 1
+                    ws.column_dimensions[col_letter].width = 25
 
-            if ref_image_paths:
-                col_letter = ws.cell(1, ref_col_idx).column_letter
-                start_row = first_data_row
-
-                for img_path in ref_image_paths:
-                    img = XLImage(img_path)
-                    img.width = 140
-                    img.height = 90
-                    ws.add_image(img, f"{col_letter}{start_row}")
-                    ws.row_dimensions[start_row].height = 80
-                    start_row += 1  # stack images vertically
-
-                ws.column_dimensions[col_letter].width = 25
+            # Optional: widen some columns for readability
+            try:
+                for col_name in ["File", "Sheet", "OK - Nominal and Tolerance value"]:
+                    if col_name in df.columns:
+                        idx = df.columns.get_loc(col_name) + 1
+                        ws.column_dimensions[get_column_letter(idx)].width = 22
+                for col_name in ["PDJ Nominal Value", "PDJ Tolerance Value", "TCM Nominal Value", "TCM Tolerance Value"]:
+                    if col_name in df.columns:
+                        idx = df.columns.get_loc(col_name) + 1
+                        ws.column_dimensions[get_column_letter(idx)].width = 18
+            except Exception:
+                pass
 
             output = io.BytesIO()
             wb.save(output)
