@@ -17,7 +17,7 @@ st.set_page_config(page_title="COD Compare", layout="wide")
 
 logo_url = "https://raw.githubusercontent.com/Uthraa-18/cod-compare-app/refs/heads/main/image.png"
 
-# Corner logo
+# Corner logo (render the <img> tag correctly)
 st.markdown(
     f"""
     <style>
@@ -623,4 +623,3 @@ if cod_file and other_files:
 
     else:
         st.warning("No matches found.")
-``
