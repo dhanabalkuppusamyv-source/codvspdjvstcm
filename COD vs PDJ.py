@@ -18,7 +18,7 @@ st.set_page_config(page_title="COD Compare", layout="wide")
 logo_url = "https://raw.githubusercontent.com/Uthraa-18/cod-compare-app/refs/heads/main/image.png"
 
 st.markdown(f"""
-<style>
+&lt;style&gt;
 .corner-logo {{
     position: fixed;
     top: 50px;
@@ -26,13 +26,13 @@ st.markdown(f"""
     width: 120px;
     z-index: 9999;
 }}
-</style>
+&lt;/style&gt;
 
-<img src="{logo_url}" class="corner-logo">
+&lt;img src="{logo_url}" class="corner-logo"&gt;
 """, unsafe_allow_html=True)
 
 st.markdown("""
-<style>
+&lt;style&gt;
 .section-title {
     font-size: 1.35rem;
     font-weight: 700;
@@ -56,69 +56,19 @@ st.markdown("""
     color: #555;
     margin-top: .25rem;
 }
-.small-input .stNumberInput > div > div > input {
+.small-input .stNumberInput &gt; div &gt; div &gt; input {
     font-size: .9rem;
 }
 .block-container { padding-top: 1rem; }
-</style>
+&lt;/style&gt;
 """, unsafe_allow_html=True)
 
 def header_with_tip(text: str, tip: str):
     st.markdown(
-        f"<div class='section-title'>{text}"
-        f"<span class='info-dot' title='{tip}'>ⓘ</span></div>",
+        f"&lt;div class='section-title'&gt;{text}"
+        f"&lt;span class='info-dot' title='{tip}'&gt;ⓘ&lt;/span&gt;&lt;/div&gt;",
         unsafe_allow_html=True
     )
-
-def extract_actual_nominal(nums, cod_nominal, eps):
-    for x in nums:
-        if approx_equal(x, cod_nominal, eps):
-            return x
-    return None
-
-def extract_actual_tolerance(nums):
-    """
-    Return tolerance if present:
-    - Prefer ± pair
-    - Else single positive value
-    """
-    for x in nums:
-        if -x in nums:
-            return abs(x)
-    for x in nums:
-        if x > 0:
-            return abs(x)
-    return None
-
-def extract_pdj_nominal(nums, cod_nominal, eps):
-    """Return PDJ nominal value matching COD nominal"""
-    for x in nums:
-        if approx_equal(x, cod_nominal, eps):
-            return x
-    return ""
-
-def extract_pdj_tolerance(nums):
-    """Return PDJ tolerance (± value) if present"""
-    for x in nums:
-        if -x in nums:
-            return fmt_pm(abs(x))
-    return ""
-
-def extract_all_images_from_cod(cod_file_path):
-    wb = load_workbook(cod_file_path)
-    ws = wb.active
-
-    images = []
-    if not hasattr(ws, "_images"):
-        return images
-
-    for i, img in enumerate(ws._images):
-        img_path = f"/tmp/ref_image_{i}.png"
-        with open(img_path, "wb") as f:
-            f.write(img._data())
-        images.append(img_path)
-
-    return images
 
 # ==============================
 # Regex & utilities
@@ -322,22 +272,22 @@ st.title("🔎 COD, PDJ, TCM Automatic Validation")
 
 header_with_tip(
     "What this does",
-    "Extracts Nominal & Tolerance from COD and compares PDJ/TCM rows."
+    "Extracts Nominal &amp; Tolerance from COD and compares PDJ/TCM rows."
 )
 st.caption("Epsilon allows 1.41 ≈ 1.4")
 
 with st.container():
-    st.markdown("<div class='small-input'>", unsafe_allow_html=True)
+    st.markdown("&lt;div class='small-input'&gt;", unsafe_allow_html=True)
     eps = st.number_input(
         "Numeric tolerance (epsilon)",
         0.0,0.2,0.02,0.01,
         help="Lets ±1.41 match ±1.4"
     )
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("&lt;/div&gt;", unsafe_allow_html=True)
 
 header_with_tip(
     "Upload COD workbook (.xls/.xlsx)",
-    "Reads Codification, Nominal & Tolerance."
+    "Reads Codification, Nominal &amp; Tolerance."
 )
 cod_file = st.file_uploader("", type=["xls","xlsx"], key="cod")
 
@@ -362,6 +312,20 @@ if cod_file and other_files:
     with open(cod_temp_path, "wb") as f:
         f.write(cod_bytes)
 
+    # Extract reference images from COD (if any)
+    def extract_all_images_from_cod(cod_file_path):
+        wb = load_workbook(cod_file_path)
+        ws = wb.active
+        images = []
+        if not hasattr(ws, "_images"):
+            return images
+        for i, img in enumerate(ws._images):
+            img_path = f"/tmp/ref_image_{i}.png"
+            with open(img_path, "wb") as f:
+                f.write(img._data())
+            images.append(img_path)
+        return images
+
     ref_image_paths = extract_all_images_from_cod(cod_temp_path)
 
     cod_sheets = read_all_sheets(cod_file.name, cod_bytes)
@@ -372,7 +336,7 @@ if cod_file and other_files:
         st.stop()
 
     st.markdown(
-        f"<div class='subtle'>🔑 Compared Key: <code>{key_value}</code></div>",
+        f"&lt;div class='subtle'&gt;🔑 Compared Key: &lt;code&gt;{key_value}&lt;/code&gt;&lt;/div&gt;",
         unsafe_allow_html=True
     )
 
@@ -445,7 +409,23 @@ if cod_file and other_files:
 
                 nominal_ok = contains_value_eps(nums, cod_nominal, eps)
                 tol_ok = contains_pm_pair_eps(nums, tol_mag, eps)
-                actual_nominal_found = extract_actual_nominal(nums, cod_nominal, eps)
+
+                actual_nominal_found = None
+                for x in nums:
+                    if approx_equal(x, cod_nominal, eps):
+                        actual_nominal_found = x
+                        break
+
+                def extract_actual_tolerance(nums_list):
+                    # Prefer ± pair, else single positive value
+                    for x in nums_list:
+                        if -x in nums_list:
+                            return abs(x)
+                    for x in nums_list:
+                        if x > 0:
+                            return abs(x)
+                    return None
+
                 actual_tolerance_found = extract_actual_tolerance(nums)
 
                 # Collect numeric tokens from the key row in appearance order,
@@ -489,13 +469,8 @@ if cod_file and other_files:
                     matched.append(f"{ref_nom_disp}")
                 if tol_ok:
                     matched.append(fmt_pm(ref_tol_disp))
-                pdj_nominal_val = ""
-                pdj_tolerance_val = ""
 
-                if is_pdj:
-                    pdj_nominal_val = extract_pdj_nominal(nums, cod_nominal, eps)
-                    pdj_tolerance_val = extract_pdj_tolerance(nums)
-
+                # NOTE: PDJ columns are intentionally collected but NOT displayed/exported
                 results.append({
                     "Compared Key": key_value,
                     "File": tag,
@@ -503,8 +478,8 @@ if cod_file and other_files:
                     "Key Row": r+1,
                     "COD Nominal": ref_nom_disp,
                     "COD Tolerance": fmt_pm(ref_tol_disp),
-                    "PDJ Nominal Value": pdj_nominal_val,
-                    "PDJ Tolerance Value": pdj_tolerance_val,
+                    # "PDJ Nominal Value": pdj_nominal_val,          # Removed from UI/Excel
+                    # "PDJ Tolerance Value": pdj_tolerance_val,      # Removed from UI/Excel
                     "TCM Nominal Value": tcm_nominal_str,
                     "TCM Tolerance Value": fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
@@ -523,8 +498,7 @@ if cod_file and other_files:
         # Add SI.No as first column
         df_out.insert(0, "SI.No", range(1, len(df_out) + 1))
 
-        # -------- On-screen table: REMOVE PDJ columns --------
-        # Define the order WITHOUT "PDJ Nominal Value" and "PDJ Tolerance Value"
+        # -------- On-screen table: WITHOUT PDJ columns --------
         desired_order_ui = [
             "SI.No",                    # A
             "Compared Key",             # B
@@ -533,9 +507,8 @@ if cod_file and other_files:
             "Key Row",                  # E
             "COD Nominal",              # F
             "COD Tolerance",            # G
-            # (H, I removed)
-            "TCM Nominal Value",        # H (shifted)
-            "TCM Tolerance Value",      # I (shifted)
+            "TCM Nominal Value",        # H
+            "TCM Tolerance Value",      # I
             "Actual Nominal Found ?",   # J
             "Actual Tolerance Found ?", # K
             "OK - Nominal and Tolerance value", # L
@@ -562,9 +535,13 @@ if cod_file and other_files:
 
         def create_colored_excel(df):
             """
-            Export to Excel while REMOVING 'PDJ Nominal Value' and 'PDJ Tolerance Value'.
+            Export to Excel WITHOUT 'PDJ Nominal Value' and 'PDJ Tolerance Value'.
             """
-            export_df = df.drop(columns=["PDJ Nominal Value", "PDJ Tolerance Value"], errors="ignore")
+            # Ensure PDJ columns do not exist (safety)
+            export_df = df.copy()
+            for col in ["PDJ Nominal Value", "PDJ Tolerance Value"]:
+                if col in export_df.columns:
+                    export_df = export_df.drop(columns=[col])
 
             wb = Workbook()
             ws = wb.active
@@ -631,7 +608,7 @@ if cod_file and other_files:
             wb.save(output)
             return output.getvalue()
 
-        # Use the full df_out (not the UI-pruned one) for export, because export drops PDJ itself
+        # Use the full df_out for export; PDJ columns are not present in df_out already
         excel_data = create_colored_excel(df_out)
 
         st.download_button(
