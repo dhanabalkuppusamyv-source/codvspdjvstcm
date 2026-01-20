@@ -17,56 +17,62 @@ st.set_page_config(page_title="COD Compare", layout="wide")
 
 logo_url = "https://raw.githubusercontent.com/Uthraa-18/cod-compare-app/refs/heads/main/image.png"
 
-st.markdown(f"""
-&lt;style&gt;
-.corner-logo {{
-    position: fixed;
-    top: 50px;
-    right: 20px;
-    width: 120px;
-    z-index: 9999;
-}}
-&lt;/style&gt;
+# Corner logo
+st.markdown(
+    f"""
+    <style>
+    .corner-logo {{
+        position: fixed;
+        top: 50px;
+        right: 20px;
+        width: 120px;
+        z-index: 9999;
+    }}
+    </style>
+    <img src="{logo_url}" class="corner-logo">
+    """,
+    unsafe_allow_html=True
+)
 
-&lt;img src="{logo_url}" class="corner-logo"&gt;
-""", unsafe_allow_html=True)
-
-st.markdown("""
-&lt;style&gt;
-.section-title {
-    font-size: 1.35rem;
-    font-weight: 700;
-    display: inline-flex;
-    align-items: center;
-    gap: .5rem;
-    margin: .25rem 0 .5rem 0;
-}
-.info-dot {
-    display:inline-block;
-    font-size: 0.95rem;
-    line-height: 1;
-    padding: .1rem .35rem;
-    border-radius: 999px;
-    border: 1px solid #aaa;
-    color: #333;
-    cursor: help;
-}
-.subtle {
-    font-size: 0.95rem;
-    color: #555;
-    margin-top: .25rem;
-}
-.small-input .stNumberInput &gt; div &gt; div &gt; input {
-    font-size: .9rem;
-}
-.block-container { padding-top: 1rem; }
-&lt;/style&gt;
-""", unsafe_allow_html=True)
+# Page CSS
+st.markdown(
+    """
+    <style>
+    .section-title {
+        font-size: 1.35rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        margin: .25rem 0 .5rem 0;
+    }
+    .info-dot {
+        display:inline-block;
+        font-size: 0.95rem;
+        line-height: 1;
+        padding: .1rem .35rem;
+        border-radius: 999px;
+        border: 1px solid #aaa;
+        color: #333;
+        cursor: help;
+    }
+    .subtle {
+        font-size: 0.95rem;
+        color: #555;
+        margin-top: .25rem;
+    }
+    .small-input .stNumberInput > div > div > input {
+        font-size: .9rem;
+    }
+    .block-container { padding-top: 1rem; }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 def header_with_tip(text: str, tip: str):
     st.markdown(
-        f"&lt;div class='section-title'&gt;{text}"
-        f"&lt;span class='info-dot' title='{tip}'&gt;ⓘ&lt;/span&gt;&lt;/div&gt;",
+        f"<div class='section-title'>{text}<span class='info-dot' title='{tip}'>ⓘ</span></div>",
         unsafe_allow_html=True
     )
 
@@ -272,22 +278,22 @@ st.title("🔎 COD, PDJ, TCM Automatic Validation")
 
 header_with_tip(
     "What this does",
-    "Extracts Nominal &amp; Tolerance from COD and compares PDJ/TCM rows."
+    "Extracts Nominal & Tolerance from COD and compares PDJ/TCM rows."
 )
 st.caption("Epsilon allows 1.41 ≈ 1.4")
 
 with st.container():
-    st.markdown("&lt;div class='small-input'&gt;", unsafe_allow_html=True)
+    st.markdown("<div class='small-input'>", unsafe_allow_html=True)
     eps = st.number_input(
         "Numeric tolerance (epsilon)",
         0.0,0.2,0.02,0.01,
         help="Lets ±1.41 match ±1.4"
     )
-    st.markdown("&lt;/div&gt;", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 header_with_tip(
     "Upload COD workbook (.xls/.xlsx)",
-    "Reads Codification, Nominal &amp; Tolerance."
+    "Reads Codification, Nominal & Tolerance."
 )
 cod_file = st.file_uploader("", type=["xls","xlsx"], key="cod")
 
@@ -336,7 +342,7 @@ if cod_file and other_files:
         st.stop()
 
     st.markdown(
-        f"&lt;div class='subtle'&gt;🔑 Compared Key: &lt;code&gt;{key_value}&lt;/code&gt;&lt;/div&gt;",
+        f"<div class='subtle'>🔑 Compared Key: <code>{key_value}</code></div>",
         unsafe_allow_html=True
     )
 
@@ -410,6 +416,7 @@ if cod_file and other_files:
                 nominal_ok = contains_value_eps(nums, cod_nominal, eps)
                 tol_ok = contains_pm_pair_eps(nums, tol_mag, eps)
 
+                # Actual values detected
                 actual_nominal_found = None
                 for x in nums:
                     if approx_equal(x, cod_nominal, eps):
@@ -470,7 +477,7 @@ if cod_file and other_files:
                 if tol_ok:
                     matched.append(fmt_pm(ref_tol_disp))
 
-                # NOTE: PDJ columns are intentionally collected but NOT displayed/exported
+                # No PDJ columns included in outputs
                 results.append({
                     "Compared Key": key_value,
                     "File": tag,
@@ -478,8 +485,6 @@ if cod_file and other_files:
                     "Key Row": r+1,
                     "COD Nominal": ref_nom_disp,
                     "COD Tolerance": fmt_pm(ref_tol_disp),
-                    # "PDJ Nominal Value": pdj_nominal_val,          # Removed from UI/Excel
-                    # "PDJ Tolerance Value": pdj_tolerance_val,      # Removed from UI/Excel
                     "TCM Nominal Value": tcm_nominal_str,
                     "TCM Tolerance Value": fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
@@ -498,7 +503,7 @@ if cod_file and other_files:
         # Add SI.No as first column
         df_out.insert(0, "SI.No", range(1, len(df_out) + 1))
 
-        # -------- On-screen table: WITHOUT PDJ columns --------
+        # On-screen table (no PDJ columns)
         desired_order_ui = [
             "SI.No",                    # A
             "Compared Key",             # B
@@ -537,7 +542,6 @@ if cod_file and other_files:
             """
             Export to Excel WITHOUT 'PDJ Nominal Value' and 'PDJ Tolerance Value'.
             """
-            # Ensure PDJ columns do not exist (safety)
             export_df = df.copy()
             for col in ["PDJ Nominal Value", "PDJ Tolerance Value"]:
                 if col in export_df.columns:
@@ -608,7 +612,6 @@ if cod_file and other_files:
             wb.save(output)
             return output.getvalue()
 
-        # Use the full df_out for export; PDJ columns are not present in df_out already
         excel_data = create_colored_excel(df_out)
 
         st.download_button(
