@@ -109,15 +109,11 @@ def extract_all_images_from_cod(cod_file_path):
     ws = wb.active
 
     images = []
-
-    # openpyxl stores images in ws._images (private), if present
     if not hasattr(ws, "_images"):
         return images
 
     for i, img in enumerate(ws._images):
         img_path = f"/tmp/ref_image_{i}.png"
-        # write raw image bytes
-        # Note: This uses a private method; works for many openpyxl builds
         with open(img_path, "wb") as f:
             f.write(img._data())
         images.append(img_path)
@@ -453,26 +449,21 @@ if cod_file and other_files:
                 actual_tolerance_found = extract_actual_tolerance(nums)
 
                 # Collect numeric tokens from the key row in appearance order,
-                # dedupe near-equals, then keep:
-                #   - any fractional numbers (e.g. 1.2, 6.5, 2.5)
-                #   - OR any number that matches the COD nominal (within eps)
-                # BUT exclude any token that equals the detected tolerance magnitude for that row.
+                # dedupe near-equals, then keep fractional or COD-matching values,
+                # excluding tolerance magnitude
                 row = df.iloc[r, :].tolist()
                 ordered_nums = []
                 for cell in row:
                     s = "" if pd.isna(cell) else str(cell)
-                    # capture explicit ± patterns first (gives magnitude)
                     for m in RE_PM.findall(s):
                         x = to_float(m)
                         if x is not None:
                             ordered_nums.append(abs(x))
-                    # then capture other numeric occurrences in the text in order
                     for m in RE_NUM.finditer(s):
                         x = to_float(m.group(0))
                         if x is not None:
                             ordered_nums.append(abs(x))
 
-                # Deduplicate near-equal numbers while keeping first-seen order (use eps)
                 tcm_all_values = []
                 for x in ordered_nums:
                     if x is None:
@@ -481,20 +472,16 @@ if cod_file and other_files:
                         tcm_all_values.append(x)
 
                 def is_fractional(val, eps_local):
-                    # True if value is not approximately an integer (uses eps)
                     return not approx_equal(val, round(val), eps_local)
 
-                # keep fractional values OR COD-matching values, but exclude tolerance magnitude
                 tcm_nominal_values = []
                 for x in tcm_all_values:
-                    # skip tokens that match the detected tolerance for this row
                     if actual_tolerance_found is not None and approx_equal(x, actual_tolerance_found, eps):
                         continue
                     if is_fractional(x, eps) or approx_equal(x, cod_nominal, eps):
                         if not any(approx_equal(x, v, eps) for v in tcm_nominal_values):
                             tcm_nominal_values.append(x)
 
-                # Format for display
                 tcm_nominal_str = ", ".join(fmt_num(v) for v in tcm_nominal_values) if tcm_nominal_values else ""
 
                 matched=[]
@@ -536,16 +523,9 @@ if cod_file and other_files:
         # Add SI.No as first column
         df_out.insert(0, "SI.No", range(1, len(df_out) + 1))
 
-        # --- IMPORTANT: Ensure PDJ columns (H & I) exist and remain ---
-        # Create empty columns if missing (safety)
-        for col in ["PDJ Nominal Value", "PDJ Tolerance Value"]:
-            if col not in df_out.columns:
-                df_out[col] = ""
-
-        # Reorder columns so that:
-        #   H = PDJ Nominal Value
-        #   I = PDJ Tolerance Value
-        desired_order = [
+        # -------- On-screen table: REMOVE PDJ columns --------
+        # Define the order WITHOUT "PDJ Nominal Value" and "PDJ Tolerance Value"
+        desired_order_ui = [
             "SI.No",                    # A
             "Compared Key",             # B
             "File",                     # C
@@ -553,18 +533,17 @@ if cod_file and other_files:
             "Key Row",                  # E
             "COD Nominal",              # F
             "COD Tolerance",            # G
-            "PDJ Nominal Value",        # H
-            "PDJ Tolerance Value",      # I
-            "TCM Nominal Value",        # J
-            "TCM Tolerance Value",      # K
-            "Actual Nominal Found ?",   # L
-            "Actual Tolerance Found ?", # M
-            "OK - Nominal and Tolerance value", # N
-            "Not-OK Value",             # O
-            "Ref image"                 # P
+            # (H, I removed)
+            "TCM Nominal Value",        # H (shifted)
+            "TCM Tolerance Value",      # I (shifted)
+            "Actual Nominal Found ?",   # J
+            "Actual Tolerance Found ?", # K
+            "OK - Nominal and Tolerance value", # L
+            "Not-OK Value",             # M
+            "Ref image"                 # N
         ]
-        existing = [c for c in desired_order if c in df_out.columns]
-        df_out = df_out[existing]
+        existing_ui = [c for c in desired_order_ui if c in df_out.columns]
+        df_out_ui = df_out[existing_ui].copy()
 
         # Coloring in Streamlit UI for Yes/No columns
         def color_yes_no(val):
@@ -573,7 +552,7 @@ if cod_file and other_files:
             else:
                 return "background-color:#FFB3B3; color:black;"
 
-        styled_df = df_out.style.applymap(
+        styled_df = df_out_ui.style.applymap(
             color_yes_no,
             subset=["Actual Nominal Found ?", "Actual Tolerance Found ?"]
         )
@@ -582,6 +561,11 @@ if cod_file and other_files:
         st.dataframe(styled_df, use_container_width=True)
 
         def create_colored_excel(df):
+            """
+            Export to Excel while REMOVING 'PDJ Nominal Value' and 'PDJ Tolerance Value'.
+            """
+            export_df = df.drop(columns=["PDJ Nominal Value", "PDJ Tolerance Value"], errors="ignore")
+
             wb = Workbook()
             ws = wb.active
             ws.title = "Results"
@@ -591,8 +575,8 @@ if cod_file and other_files:
             border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
             # Header
-            ws.append(df.columns.tolist())
-            for c in range(1, len(df.columns) + 1):
+            ws.append(export_df.columns.tolist())
+            for c in range(1, len(export_df.columns) + 1):
                 ws.cell(row=1, column=c).border = border
 
             # Fills
@@ -600,23 +584,23 @@ if cod_file and other_files:
             red = PatternFill(start_color="FFB3B3", end_color="FFB3B3", fill_type="solid")
 
             # Data rows
-            for _, row_data in df.iterrows():
-                ws.append([row_data.get(col, "") for col in df.columns])
+            for _, row_data in export_df.iterrows():
+                ws.append([row_data.get(col, "") for col in export_df.columns])
                 excel_r = ws.max_row
-                for c in range(1, len(df.columns) + 1):
+                for c in range(1, len(export_df.columns) + 1):
                     ws.cell(row=excel_r, column=c).border = border
 
             # Apply green/red fills after writing all rows
-            if "Actual Nominal Found ?" in df.columns and "Actual Tolerance Found ?" in df.columns:
-                an_col = df.columns.get_loc("Actual Nominal Found ?") + 1
-                at_col = df.columns.get_loc("Actual Tolerance Found ?") + 1
+            if "Actual Nominal Found ?" in export_df.columns and "Actual Tolerance Found ?" in export_df.columns:
+                an_col = export_df.columns.get_loc("Actual Nominal Found ?") + 1
+                at_col = export_df.columns.get_loc("Actual Tolerance Found ?") + 1
                 for r in range(2, ws.max_row + 1):
                     ws.cell(r, an_col).fill = green if ws.cell(r, an_col).value == "Yes" else red
                     ws.cell(r, at_col).fill = green if ws.cell(r, at_col).value == "Yes" else red
 
             # Place reference images without altering columns
-            if "Ref image" in df.columns:
-                ref_col_idx = df.columns.get_loc("Ref image") + 1
+            if "Ref image" in export_df.columns:
+                ref_col_idx = export_df.columns.get_loc("Ref image") + 1
                 first_data_row = 2
                 if ref_image_paths:
                     col_letter = ws.cell(1, ref_col_idx).column_letter
@@ -633,12 +617,12 @@ if cod_file and other_files:
             # Optional: widen some columns for readability
             try:
                 for col_name in ["File", "Sheet", "OK - Nominal and Tolerance value"]:
-                    if col_name in df.columns:
-                        idx = df.columns.get_loc(col_name) + 1
+                    if col_name in export_df.columns:
+                        idx = export_df.columns.get_loc(col_name) + 1
                         ws.column_dimensions[get_column_letter(idx)].width = 22
-                for col_name in ["PDJ Nominal Value", "PDJ Tolerance Value", "TCM Nominal Value", "TCM Tolerance Value"]:
-                    if col_name in df.columns:
-                        idx = df.columns.get_loc(col_name) + 1
+                for col_name in ["TCM Nominal Value", "TCM Tolerance Value"]:
+                    if col_name in export_df.columns:
+                        idx = export_df.columns.get_loc(col_name) + 1
                         ws.column_dimensions[get_column_letter(idx)].width = 18
             except Exception:
                 pass
@@ -647,6 +631,7 @@ if cod_file and other_files:
             wb.save(output)
             return output.getvalue()
 
+        # Use the full df_out (not the UI-pruned one) for export, because export drops PDJ itself
         excel_data = create_colored_excel(df_out)
 
         st.download_button(
@@ -658,3 +643,4 @@ if cod_file and other_files:
 
     else:
         st.warning("No matches found.")
+``
