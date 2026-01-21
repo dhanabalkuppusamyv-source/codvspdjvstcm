@@ -485,8 +485,8 @@ if cod_file and other_files:
                     "Key Row": r+1,
                     "COD Nominal": ref_nom_disp,
                     "COD Tolerance": fmt_pm(ref_tol_disp),
-                    "TCM Nominal Value": tcm_nominal_str,
-                    "TCM Tolerance Value": fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
+                    "PDJ TCM Nominal Value": tcm_nominal_str,
+                    "PDJ TCM Tolerance Value": fmt_pm(actual_tolerance_found) if actual_tolerance_found is not None else "",
                     "Actual Nominal Found ?": "Yes" if nominal_ok else "No",
                     "Actual Tolerance Found ?": "Yes" if tol_ok else "No",
                     "OK - Nominal and Tolerance value": ", ".join(matched),
@@ -512,8 +512,8 @@ if cod_file and other_files:
             "Key Row",                  # E
             "COD Nominal",              # F
             "COD Tolerance",            # G
-            "PDJ & TCM Nominal Value",        # H
-            "PDJ & TCM Tolerance Value",      # I
+            "PDJ TCM Nominal Value",        # H
+            "PDJ TCM Tolerance Value",      # I
             "Actual Nominal Found ?",   # J
             "Actual Tolerance Found ?", # K
             "OK - Nominal and Tolerance value", # L
@@ -623,4 +623,5 @@ if cod_file and other_files:
 
     else:
         st.warning("No matches found.")
+
 
