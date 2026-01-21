@@ -512,8 +512,8 @@ if cod_file and other_files:
             "Key Row",                  # E
             "COD Nominal",              # F
             "COD Tolerance",            # G
-            "TCM Nominal Value",        # H
-            "TCM Tolerance Value",      # I
+            "PDJ & TCM Nominal Value",        # H
+            "PDJ & TCM Tolerance Value",      # I
             "Actual Nominal Found ?",   # J
             "Actual Tolerance Found ?", # K
             "OK - Nominal and Tolerance value", # L
@@ -623,3 +623,4 @@ if cod_file and other_files:
 
     else:
         st.warning("No matches found.")
+
